@@ -44,10 +44,19 @@ class BarrelOrder(BaseModel):
 @dataclass
 class BarrelSummary:
     gold_paid: int
+    red_ml: int
+    green_ml: int
+    blue_ml: int
+    dark_ml: int
 
 
 def calculate_barrel_summary(barrels: List[Barrel]) -> BarrelSummary:
-    return BarrelSummary(gold_paid=sum(b.price * b.quantity for b in barrels))
+    return BarrelSummary(gold_paid=sum(b.price * b.quantity for b in barrels),
+                            red_ml=sum(int(b.ml_per_barrel * b.potion_type[0]) * b.quantity for b in barrels),
+                            green_ml=sum(int(b.ml_per_barrel * b.potion_type[1]) * b.quantity for b in barrels),
+                            blue_ml=sum(int(b.ml_per_barrel * b.potion_type[2]) * b.quantity for b in barrels),
+                            dark_ml=sum(int(b.ml_per_barrel * b.potion_type[3]) * b.quantity for b in barrels))
+
 
 
 @router.post("/deliver/{order_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -66,9 +75,17 @@ def post_deliver_barrels(barrels_delivered: List[Barrel], order_id: int):
                 """
                 UPDATE global_inventory SET 
                 gold = gold - :gold_paid
+                red_ml = red_ml + :red_ml,
+                green_ml = green_ml + :green_ml,
+                blue_ml = blue_ml + :blue_ml,
+                dark_ml = dark_ml + :dark_ml
                 """
             ),
-            [{"gold_paid": delivery.gold_paid}],
+            [{"gold_paid": delivery.gold_paid},
+             {"red_ml": delivery.red_ml},
+             {"green_ml": delivery.green_ml},
+             {"blue_ml": delivery.blue_ml},
+             {"dark_ml": delivery.dark_ml}],
         )
 
     pass
@@ -110,25 +127,24 @@ def get_wholesale_purchase_plan(wholesale_catalog: List[Barrel]):
     """
     print(f"barrel catalog: {wholesale_catalog}")
 
-    with db.engine.begin() as connection:
-        row = connection.execute(
-            sqlalchemy.text(
-                """
-                SELECT gold
-                FROM global_inventory
-                """
-            )
-        ).one()
+    sql_to_execute = """ SELECT gold, red_ml, green_ml, blue_ml, dark_ml FROM global_inventory """
 
-        gold = row.gold
+    with db.engine.begin() as connection:
+        result = connection.execute(sqlalchemy.text(sql_to_execute)).one()
+        gold = result.gold
+        red_ml = result.red_ml
+        green_ml = result.green_ml
+        blue_ml = result.blue_ml
+        dark_ml = result.dark_ml
+
 
     # TODO: fill in values correctly based on what is in your database
     return create_barrel_plan(
         gold=gold,
         max_barrel_capacity=10000,
-        current_red_ml=0,
-        current_green_ml=0,
-        current_blue_ml=0,
-        current_dark_ml=0,
+        current_red_ml=red_ml,
+        current_green_ml=green_ml,
+        current_blue_ml=blue_ml,
+        current_dark_ml=dark_ml,
         wholesale_catalog=wholesale_catalog,
     )
