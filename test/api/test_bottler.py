@@ -1,4 +1,4 @@
-from src.api.bottler import PotionMixes, create_bottle_plan
+from src.api.bottler import create_bottle_plan
 
 
 from typing import List
