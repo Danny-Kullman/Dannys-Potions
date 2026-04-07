@@ -36,15 +36,24 @@ def get_inventory():
         row = connection.execute(
             sqlalchemy.text(
                 """
-                SELECT gold
+                SELECT gold, red_ml, green_ml, blue_ml, dark_ml, 
+                red_potions, green_potions, blue_potions, dark_potions
                 FROM global_inventory
                 """
             )
         ).one()
 
         gold = row.gold
+        red_potions = row.red_potions
+        green_potions = row.green_potions
+        blue_potions = row.blue_potions
+        dark_potions = row.dark_potions
+        red_ml = row.red_ml
+        green_ml = row.green_ml
+        blue_ml = row.blue_ml
+        dark_ml = row.dark_ml
 
-    return InventoryAudit(number_of_potions=0, ml_in_barrels=0, gold=gold)
+    return InventoryAudit(number_of_potions=red_potions + green_potions + blue_potions + dark_potions, ml_in_barrels=red_ml + green_ml + blue_ml + dark_ml, gold=gold)
 
 
 @router.post("/plan", response_model=CapacityPlan)

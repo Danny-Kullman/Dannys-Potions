@@ -139,30 +139,68 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
     total_potions_bought = sum(carts[cart_id].values())
     total_gold_paid = total_potions_bought * 50  # Assuming each potion costs 50 gold
 
+    potion_totals = {
+        "red": 0,
+        "green": 0,
+        "blue": 0,
+        "dark": 0,
+    }
+
+    for item_sku, quantity in carts[cart_id].items():
+        item_sku_lower = item_sku.lower()
+        if "red" in item_sku_lower:
+            potion_totals["red"] += quantity
+        elif "green" in item_sku_lower:
+            potion_totals["green"] += quantity
+        elif "blue" in item_sku_lower:
+            potion_totals["blue"] += quantity
+        elif "dark" in item_sku_lower:
+            potion_totals["dark"] += quantity
+        else:
+            raise HTTPException(status_code=400, detail=f"Unknown potion SKU: {item_sku}")
+
     with db.engine.begin() as connection:
         row = connection.execute(
             sqlalchemy.text(
                 """
-                SELECT gold FROM global_inventory
+                SELECT gold, red_potions, green_potions, blue_potions, dark_potions FROM global_inventory
                 """
             )
         ).one()
 
-        gold = row.gold
-        gold += total_gold_paid
+        if row.red_potions < potion_totals["red"]:
+            raise HTTPException(status_code=400, detail="Not enough red potions in inventory")
+        if row.green_potions < potion_totals["green"]:
+            raise HTTPException(status_code=400, detail="Not enough green potions in inventory")
+        if row.blue_potions < potion_totals["blue"]:
+            raise HTTPException(status_code=400, detail="Not enough blue potions in inventory")
+        if row.dark_potions < potion_totals["dark"]:
+            raise HTTPException(status_code=400, detail="Not enough dark potions in inventory")
 
         connection.execute(
             sqlalchemy.text(
                 """
                 UPDATE global_inventory SET 
-                gold = :total_gold
+                gold = gold + :total_gold_paid,
+                red_potions = red_potions - :red_potions,
+                green_potions = green_potions - :green_potions,
+                blue_potions = blue_potions - :blue_potions,
+                dark_potions = dark_potions - :dark_potions
                 """
             ),
-            [{"total_gold": gold}],
+            {
+                "total_gold_paid": total_gold_paid,
+                "red_potions": potion_totals["red"],
+                "green_potions": potion_totals["green"],
+                "blue_potions": potion_totals["blue"],
+                "dark_potions": potion_totals["dark"],
+            },
         )
     # TODO: Deduct the right potions from inventory to the shop
 
-    
+    carts[cart_id] = {}
+
+
 
     return CheckoutResponse(
         total_potions_bought=total_potions_bought, total_gold_paid=total_gold_paid
