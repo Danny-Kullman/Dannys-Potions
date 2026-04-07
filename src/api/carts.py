@@ -157,7 +157,9 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
         elif "dark" in item_sku_lower:
             potion_totals["dark"] += quantity
         else:
-            raise HTTPException(status_code=400, detail=f"Unknown potion SKU: {item_sku}")
+            raise HTTPException(
+                status_code=400, detail=f"Unknown potion SKU: {item_sku}"
+            )
 
     with db.engine.begin() as connection:
         row = connection.execute(
@@ -169,13 +171,21 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
         ).one()
 
         if row.red_potions < potion_totals["red"]:
-            raise HTTPException(status_code=400, detail="Not enough red potions in inventory")
+            raise HTTPException(
+                status_code=400, detail="Not enough red potions in inventory"
+            )
         if row.green_potions < potion_totals["green"]:
-            raise HTTPException(status_code=400, detail="Not enough green potions in inventory")
+            raise HTTPException(
+                status_code=400, detail="Not enough green potions in inventory"
+            )
         if row.blue_potions < potion_totals["blue"]:
-            raise HTTPException(status_code=400, detail="Not enough blue potions in inventory")
+            raise HTTPException(
+                status_code=400, detail="Not enough blue potions in inventory"
+            )
         if row.dark_potions < potion_totals["dark"]:
-            raise HTTPException(status_code=400, detail="Not enough dark potions in inventory")
+            raise HTTPException(
+                status_code=400, detail="Not enough dark potions in inventory"
+            )
 
         connection.execute(
             sqlalchemy.text(
@@ -199,8 +209,6 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
     # TODO: Deduct the right potions from inventory to the shop
 
     carts[cart_id] = {}
-
-
 
     return CheckoutResponse(
         total_potions_bought=total_potions_bought, total_gold_paid=total_gold_paid

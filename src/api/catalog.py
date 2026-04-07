@@ -23,7 +23,11 @@ class CatalogItem(BaseModel):
 # Placeholder function, you will replace this with a database call
 def create_catalog() -> List[CatalogItem]:
     with db.engine.begin() as connection:
-        result = connection.execute(sqlalchemy.text("SELECT red_potions, green_potions, blue_potions, dark_potions FROM global_inventory")).fetchone()
+        result = connection.execute(
+            sqlalchemy.text(
+                "SELECT red_potions, green_potions, blue_potions, dark_potions FROM global_inventory"
+            )
+        ).fetchone()
         red_potions = result.red_potions
         green_potions = result.green_potions
         blue_potions = result.blue_potions

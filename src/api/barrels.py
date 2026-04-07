@@ -52,12 +52,21 @@ class BarrelSummary:
 
 
 def calculate_barrel_summary(barrels: List[Barrel]) -> BarrelSummary:
-    return BarrelSummary(gold_paid=sum(b.price * b.quantity for b in barrels),
-                            red_ml=sum(int(b.ml_per_barrel * b.potion_type[0]) * b.quantity for b in barrels),
-                            green_ml=sum(int(b.ml_per_barrel * b.potion_type[1]) * b.quantity for b in barrels),
-                            blue_ml=sum(int(b.ml_per_barrel * b.potion_type[2]) * b.quantity for b in barrels),
-                            dark_ml=sum(int(b.ml_per_barrel * b.potion_type[3]) * b.quantity for b in barrels))
-
+    return BarrelSummary(
+        gold_paid=sum(b.price * b.quantity for b in barrels),
+        red_ml=sum(
+            int(b.ml_per_barrel * b.potion_type[0]) * b.quantity for b in barrels
+        ),
+        green_ml=sum(
+            int(b.ml_per_barrel * b.potion_type[1]) * b.quantity for b in barrels
+        ),
+        blue_ml=sum(
+            int(b.ml_per_barrel * b.potion_type[2]) * b.quantity for b in barrels
+        ),
+        dark_ml=sum(
+            int(b.ml_per_barrel * b.potion_type[3]) * b.quantity for b in barrels
+        ),
+    )
 
 
 @router.post("/deliver/{order_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -82,12 +91,15 @@ def post_deliver_barrels(barrels_delivered: List[Barrel], order_id: int):
                 dark_ml = dark_ml + :delivered_dark_ml
                 """
             ),
-            {"gold_paid": delivery.gold_paid,
-             "delivered_red_ml": delivery.red_ml,
-             "delivered_green_ml": delivery.green_ml,
-             "delivered_blue_ml": delivery.blue_ml,
-             "delivered_dark_ml": delivery.dark_ml}
+            {
+                "gold_paid": delivery.gold_paid,
+                "delivered_red_ml": delivery.red_ml,
+                "delivered_green_ml": delivery.green_ml,
+                "delivered_blue_ml": delivery.blue_ml,
+                "delivered_dark_ml": delivery.dark_ml,
+            },
         )
+
 
 def create_barrel_plan(
     gold: int,
@@ -139,7 +151,8 @@ def create_barrel_plan(
         (
             barrel
             for barrel in wholesale_catalog
-                if barrel.potion_type[chosen_index] == 1 and barrel.ml_per_barrel <= max_barrel_capacity
+            if barrel.potion_type[chosen_index] == 1
+            and barrel.ml_per_barrel <= max_barrel_capacity
         ),
         key=lambda b: b.price,
         default=None,

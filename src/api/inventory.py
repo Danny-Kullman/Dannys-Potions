@@ -53,7 +53,11 @@ def get_inventory():
         blue_ml = row.blue_ml
         dark_ml = row.dark_ml
 
-    return InventoryAudit(number_of_potions=red_potions + green_potions + blue_potions + dark_potions, ml_in_barrels=red_ml + green_ml + blue_ml + dark_ml, gold=gold)
+    return InventoryAudit(
+        number_of_potions=red_potions + green_potions + blue_potions + dark_potions,
+        ml_in_barrels=red_ml + green_ml + blue_ml + dark_ml,
+        gold=gold,
+    )
 
 
 @router.post("/plan", response_model=CapacityPlan)

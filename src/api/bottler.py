@@ -68,11 +68,14 @@ def post_deliver_bottles(potions_delivered: List[PotionMixes], order_id: int):
                 dark_ml = dark_ml - (100 * :dark_potions)
                 """
             ),
-            {"red_potions": red_potions,
-             "green_potions": green_potions,
-             "blue_potions": blue_potions,
-             "dark_potions": dark_potions},
+            {
+                "red_potions": red_potions,
+                "green_potions": green_potions,
+                "blue_potions": blue_potions,
+                "dark_potions": dark_potions,
+            },
         )
+
 
 def create_bottle_plan(
     red_ml: int,
@@ -81,7 +84,6 @@ def create_bottle_plan(
     dark_ml: int,
     maximum_potion_capacity: int,
 ) -> List[PotionMixes]:
-    
     possible_by_color = [
         ([100, 0, 0, 0], red_ml // 100),
         ([0, 100, 0, 0], green_ml // 100),
@@ -98,7 +100,9 @@ def create_bottle_plan(
 
         quantity_to_bottle = min(possible_quantity, remaining_potion_capacity)
         if quantity_to_bottle > 0:
-            plan.append(PotionMixes(potion_type=potion_type, quantity=quantity_to_bottle))
+            plan.append(
+                PotionMixes(potion_type=potion_type, quantity=quantity_to_bottle)
+            )
             remaining_potion_capacity -= quantity_to_bottle
 
     return plan
@@ -111,7 +115,6 @@ def get_bottle_plan():
     Each bottle has a quantity of what proportion of red, green, blue, and dark potions to add.
     Colors are expressed in integers from 0 to 100 that must sum up to exactly 100.
     """
-
 
     sql_to_execute = """ SELECT max_potion_capacity - (red_potions + green_potions + blue_potions + dark_potions) AS remaining_potion_capacity, red_ml, green_ml, blue_ml, dark_ml, red_potions, green_potions, blue_potions, dark_potions FROM global_inventory """
 
