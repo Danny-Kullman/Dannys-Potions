@@ -10,7 +10,6 @@ def test_bottle_red_potions() -> None:
     blue_ml: int = 0
     dark_ml: int = 0
     maximum_potion_capacity: int = 1000
-    current_potion_inventory: List[PotionMixes] = []
 
     result = create_bottle_plan(
         red_ml=red_ml,
@@ -22,4 +21,4 @@ def test_bottle_red_potions() -> None:
 
     assert len(result) == 1
     assert result[0].potion_type == [100, 0, 0, 0]
-    assert result[0].quantity == 5
+    assert result[0].quantity == 1

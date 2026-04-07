@@ -108,6 +108,10 @@ def create_barrel_plan(
     current_green_ml: int,
     current_blue_ml: int,
     current_dark_ml: int,
+    current_red_potions: int,
+    current_green_potions: int,
+    current_blue_potions: int,
+    current_dark_potions: int,
     wholesale_catalog: List[Barrel],
 ) -> List[BarrelOrder]:
     print(
@@ -116,17 +120,6 @@ def create_barrel_plan(
 
     color = choice(["red", "green", "blue", "dark"])
 
-    with db.engine.begin() as connection:
-        result = connection.execute(
-            sqlalchemy.text(
-                """ SELECT red_potions, green_potions, blue_potions, dark_potions FROM global_inventory """
-            )
-        ).one()
-
-        current_red_potions = result.red_potions
-        current_green_potions = result.green_potions
-        current_blue_potions = result.blue_potions
-        current_dark_potions = result.dark_potions
     current_potions = {
         "red": current_red_potions,
         "green": current_green_potions,
@@ -183,6 +176,10 @@ def get_wholesale_purchase_plan(wholesale_catalog: List[Barrel]):
         green_ml = result.green_ml
         blue_ml = result.blue_ml
         dark_ml = result.dark_ml
+        red_potions = result.red_potions
+        green_potions = result.green_potions
+        blue_potions = result.blue_potions
+        dark_potions = result.dark_potions
 
     # TODO: fill in values correctly based on what is in your database
     return create_barrel_plan(
@@ -192,5 +189,9 @@ def get_wholesale_purchase_plan(wholesale_catalog: List[Barrel]):
         current_green_ml=green_ml,
         current_blue_ml=blue_ml,
         current_dark_ml=dark_ml,
+        current_red_potions=red_potions,
+        current_green_potions=green_potions,
+        current_blue_potions=blue_potions,
+        current_dark_potions=dark_potions,
         wholesale_catalog=wholesale_catalog,
     )

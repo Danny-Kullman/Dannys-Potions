@@ -69,6 +69,10 @@ def test_buy_small_red_barrel_plan() -> None:
         current_green_ml,
         current_blue_ml,
         current_dark_ml,
+        0,  # current_red_potions
+        0,  # current_green_potions
+        0,  # current_blue_potions
+        0,  # current_dark_potions
         wholesale_catalog,
     )
 
@@ -118,6 +122,10 @@ def test_cant_afford_barrel_plan() -> None:
         current_green_ml,
         current_blue_ml,
         current_dark_ml,
+        0,  # current_red_potions
+        0,  # current_green_potions
+        0,  # current_blue_potions
+        0,  # current_dark_potions
         wholesale_catalog,
     )
 
