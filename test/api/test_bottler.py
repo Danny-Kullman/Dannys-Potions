@@ -1,9 +1,5 @@
 from src.api.bottler import create_bottle_plan
 
-
-from typing import List
-
-
 def test_bottle_red_potions() -> None:
     red_ml: int = 100
     green_ml: int = 0
