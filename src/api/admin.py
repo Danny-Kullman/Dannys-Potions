@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, status
 import sqlalchemy
 from src.api import auth
+from src.api import carts
 from src import database as db
 
 router = APIRouter(
@@ -22,7 +23,7 @@ def reset():
             sqlalchemy.text(
                 """
                 UPDATE global_inventory SET 
-                gold = 100
+                gold = 100,
                 red_ml = 0,
                 green_ml = 0,
                 blue_ml = 0,
@@ -34,5 +35,6 @@ def reset():
                 """
             )
         )
-    # TODO: Implement database write logic here
-    pass
+
+    carts.carts.clear()
+    carts.cart_id_counter = 1
