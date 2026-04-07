@@ -18,7 +18,6 @@ def test_bottle_red_potions() -> None:
         blue_ml=blue_ml,
         dark_ml=dark_ml,
         maximum_potion_capacity=maximum_potion_capacity,
-        current_potion_inventory=current_potion_inventory,
     )
 
     assert len(result) == 1

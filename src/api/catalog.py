@@ -27,7 +27,7 @@ def create_catalog() -> List[CatalogItem]:
             sqlalchemy.text(
                 "SELECT red_potions, green_potions, blue_potions, dark_potions FROM global_inventory"
             )
-        ).fetchone()
+        ).one()
         red_potions = result.red_potions
         green_potions = result.green_potions
         blue_potions = result.blue_potions
