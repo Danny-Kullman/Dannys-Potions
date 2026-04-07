@@ -19,7 +19,8 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade():
-    op.add_column("global_inventory", sa.Column("max_barrel_capacity", sa.Integer(), nullable=False, server_default="0"))
+    op.add_column("global_inventory", sa.Column("max_barrel_capacity", sa.Integer(), nullable=False, server_default="10000"))
+    op.add_column("global_inventory", sa.Column("max_potion_capacity", sa.Integer(), nullable=False, server_default="50"))
     op.add_column("global_inventory", sa.Column("red_ml", sa.Integer(), nullable=False, server_default="0"))
     op.add_column("global_inventory", sa.Column("green_ml", sa.Integer(), nullable=False, server_default="0"))
     op.add_column("global_inventory", sa.Column("blue_ml", sa.Integer(), nullable=False, server_default="0"))
@@ -44,6 +45,7 @@ def downgrade():
     op.drop_constraint("ck_red_ml_non_negative", "global_inventory", type_="check")
     op.drop_constraint("ck_green_ml_non_negative", "global_inventory", type_="check")
     op.drop_constraint("ck_blue_ml_non_negative", "global_inventory", type_="check")
+    op.drop_constraint("ck_dark_ml_non_negative", "global_inventory", type_="check")
     op.drop_constraint("ck_red_potions_non_negative", "global_inventory", type_="check")
     op.drop_constraint("ck_green_potions_non_negative", "global_inventory", type_="check")
     op.drop_constraint("ck_blue_potions_non_negative", "global_inventory", type_="check")
@@ -55,4 +57,4 @@ def downgrade():
     op.drop_column("global_inventory", "red_potions")
     op.drop_column("global_inventory", "green_potions")
     op.drop_column("global_inventory", "blue_potions")
-
+    op.drop_column("global_inventory", "dark_potions")

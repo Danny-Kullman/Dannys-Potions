@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from random import choice
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, Field, field_validator
 from typing import List
@@ -74,22 +75,19 @@ def post_deliver_barrels(barrels_delivered: List[Barrel], order_id: int):
             sqlalchemy.text(
                 """
                 UPDATE global_inventory SET 
-                gold = gold - :gold_paid
-                red_ml = red_ml + :red_ml,
-                green_ml = green_ml + :green_ml,
-                blue_ml = blue_ml + :blue_ml,
-                dark_ml = dark_ml + :dark_ml
+                gold = gold - :gold_paid,
+                red_ml = red_ml + :delivered_red_ml,
+                green_ml = green_ml + :delivered_green_ml,
+                blue_ml = blue_ml + :delivered_blue_ml,
+                dark_ml = dark_ml + :delivered_dark_ml
                 """
             ),
-            [{"gold_paid": delivery.gold_paid},
-             {"red_ml": delivery.red_ml},
-             {"green_ml": delivery.green_ml},
-             {"blue_ml": delivery.blue_ml},
-             {"dark_ml": delivery.dark_ml}],
+            {"gold_paid": delivery.gold_paid,
+             "delivered_red_ml": delivery.red_ml,
+             "delivered_green_ml": delivery.green_ml,
+             "delivered_blue_ml": delivery.blue_ml,
+             "delivered_dark_ml": delivery.dark_ml}
         )
-
-    pass
-
 
 def create_barrel_plan(
     gold: int,
@@ -98,24 +96,52 @@ def create_barrel_plan(
     current_green_ml: int,
     current_blue_ml: int,
     current_dark_ml: int,
+    current_red_potions: int,
+    current_green_potions: int,
+    current_blue_potions: int,
+    current_dark_potions: int,
     wholesale_catalog: List[Barrel],
 ) -> List[BarrelOrder]:
     print(
         f"gold: {gold}, max_barrel_capacity: {max_barrel_capacity}, current_red_ml: {current_red_ml}, current_green_ml: {current_green_ml}, current_blue_ml: {current_blue_ml}, current_dark_ml: {current_dark_ml}, wholesale_catalog: {wholesale_catalog}"
     )
 
-    # find cheapest red barrel
-    red_barrel = min(
-        (barrel for barrel in wholesale_catalog if barrel.potion_type[0] == 1),
+    color = choice(["red", "green", "blue", "dark"])
+
+    current_potions = {
+        "red": current_red_potions,
+        "green": current_green_potions,
+        "blue": current_blue_potions,
+        "dark": current_dark_potions,
+    }
+
+    # Version 1 rule: only buy a barrel for the randomly chosen color if we have < 5 potions.
+    if current_potions[color] >= 5:
+        return []
+
+    color_index = {
+        "red": 0,
+        "green": 1,
+        "blue": 2,
+        "dark": 3,
+    }
+
+    chosen_index = color_index[color]
+
+    cheapest_chosen_barrel = min(
+        (
+            barrel
+            for barrel in wholesale_catalog
+                if barrel.potion_type[chosen_index] == 1 and barrel.ml_per_barrel <= max_barrel_capacity
+        ),
         key=lambda b: b.price,
         default=None,
     )
 
-    # make sure we can afford it
-    if red_barrel and red_barrel.price <= gold:
-        return [BarrelOrder(sku=red_barrel.sku, quantity=1)]
+    if cheapest_chosen_barrel and cheapest_chosen_barrel.price <= gold:
+        return [BarrelOrder(sku=cheapest_chosen_barrel.sku, quantity=1)]
 
-    # return an empty list if no affordable red barrel is found
+    # return an empty list if no affordable barrel is found
     return []
 
 
@@ -127,24 +153,32 @@ def get_wholesale_purchase_plan(wholesale_catalog: List[Barrel]):
     """
     print(f"barrel catalog: {wholesale_catalog}")
 
-    sql_to_execute = """ SELECT gold, red_ml, green_ml, blue_ml, dark_ml FROM global_inventory """
+    sql_to_execute = """ SELECT gold, max_barrel_capacity - (red_ml + green_ml + blue_ml + dark_ml) AS remaining_barrel_capacity, red_ml, green_ml, blue_ml, dark_ml, red_potions, green_potions, blue_potions, dark_potions FROM global_inventory """
 
     with db.engine.begin() as connection:
         result = connection.execute(sqlalchemy.text(sql_to_execute)).one()
         gold = result.gold
+        remaining_barrel_capacity = result.remaining_barrel_capacity
         red_ml = result.red_ml
         green_ml = result.green_ml
         blue_ml = result.blue_ml
         dark_ml = result.dark_ml
-
+        red_potions = result.red_potions
+        green_potions = result.green_potions
+        blue_potions = result.blue_potions
+        dark_potions = result.dark_potions
 
     # TODO: fill in values correctly based on what is in your database
     return create_barrel_plan(
         gold=gold,
-        max_barrel_capacity=10000,
+        max_barrel_capacity=remaining_barrel_capacity,
         current_red_ml=red_ml,
         current_green_ml=green_ml,
         current_blue_ml=blue_ml,
         current_dark_ml=dark_ml,
+        current_red_potions=red_potions,
+        current_green_potions=green_potions,
+        current_blue_potions=blue_potions,
+        current_dark_potions=dark_potions,
         wholesale_catalog=wholesale_catalog,
     )
