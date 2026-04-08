@@ -76,10 +76,6 @@ def test_buy_small_red_barrel_plan() -> None:
         current_green_ml,
         current_blue_ml,
         current_dark_ml,
-        0,  # current_red_potions
-        0,  # current_green_potions
-        0,  # current_blue_potions
-        0,  # current_dark_potions
         wholesale_catalog,
     )
 
@@ -128,13 +124,60 @@ def test_cant_afford_barrel_plan() -> None:
         current_green_ml,
         current_blue_ml,
         current_dark_ml,
-        0,  # current_red_potions
-        0,  # current_green_potions
-        0,  # current_blue_potions
-        0,  # current_dark_potions
         wholesale_catalog,
     )
 
     assert isinstance(barrel_orders, list)
     assert all(isinstance(order, BarrelOrder) for order in barrel_orders)
     assert len(barrel_orders) == 0  # Ensure at least one order is generated
+
+
+def test_buy_by_scarcity_until_gold_exhausted() -> None:
+    wholesale_catalog: List[Barrel] = [
+        Barrel(
+            sku="RED_GREEN_MIX",
+            ml_per_barrel=1000,
+            potion_type=[0.6, 0.4, 0, 0],
+            price=30,
+            quantity=1,
+        ),
+        Barrel(
+            sku="GREEN_ONLY",
+            ml_per_barrel=1000,
+            potion_type=[0, 1.0, 0, 0],
+            price=20,
+            quantity=1,
+        ),
+        Barrel(
+            sku="BLUE_ONLY",
+            ml_per_barrel=1000,
+            potion_type=[0, 0, 1.0, 0],
+            price=20,
+            quantity=1,
+        ),
+        Barrel(
+            sku="DARK_ONLY",
+            ml_per_barrel=1000,
+            potion_type=[0, 0, 0, 1.0],
+            price=30,
+            quantity=1,
+        ),
+    ]
+
+    barrel_orders = create_barrel_plan(
+        gold=100,
+        max_barrel_capacity=10000,
+        current_red_ml=0,
+        current_green_ml=100,
+        current_blue_ml=200,
+        current_dark_ml=300,
+        wholesale_catalog=wholesale_catalog,
+    )
+
+    assert [order.sku for order in barrel_orders] == [
+        "RED_GREEN_MIX",
+        "GREEN_ONLY",
+        "BLUE_ONLY",
+        "DARK_ONLY",
+    ]
+    assert [order.quantity for order in barrel_orders] == [1, 1, 1, 1]

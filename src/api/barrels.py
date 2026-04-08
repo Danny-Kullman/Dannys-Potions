@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from random import choice
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, Field, field_validator
 from typing import List
@@ -108,28 +107,11 @@ def create_barrel_plan(
     current_green_ml: int,
     current_blue_ml: int,
     current_dark_ml: int,
-    current_red_potions: int,
-    current_green_potions: int,
-    current_blue_potions: int,
-    current_dark_potions: int,
     wholesale_catalog: List[Barrel],
 ) -> List[BarrelOrder]:
     print(
         f"gold: {gold}, max_barrel_capacity: {max_barrel_capacity}, current_red_ml: {current_red_ml}, current_green_ml: {current_green_ml}, current_blue_ml: {current_blue_ml}, current_dark_ml: {current_dark_ml}, wholesale_catalog: {wholesale_catalog}"
     )
-
-    color = choice(["red", "green", "blue", "dark"])
-
-    current_potions = {
-        "red": current_red_potions,
-        "green": current_green_potions,
-        "blue": current_blue_potions,
-        "dark": current_dark_potions,
-    }
-
-    # Version 1 rule: only buy a barrel for the randomly chosen color if we have < 5 potions.
-    if current_potions[color] >= 5:
-        return []
 
     color_index = {
         "red": 0,
@@ -137,25 +119,62 @@ def create_barrel_plan(
         "blue": 2,
         "dark": 3,
     }
+    current_ml = {
+        "red": current_red_ml,
+        "green": current_green_ml,
+        "blue": current_blue_ml,
+        "dark": current_dark_ml,
+    }
 
-    chosen_index = color_index[color]
+    colors_by_scarcity = sorted(current_ml, key=lambda color: current_ml[color])
 
-    cheapest_chosen_barrel = min(
-        (
+    remaining_gold = gold
+    remaining_capacity = max_barrel_capacity
+    remaining_quantity_by_sku = {
+        barrel.sku: barrel.quantity for barrel in wholesale_catalog
+    }
+    orders: List[BarrelOrder] = []
+
+    for color in colors_by_scarcity:
+        color_idx = color_index[color]
+
+        eligible_barrels = [
             barrel
             for barrel in wholesale_catalog
-            if barrel.potion_type[chosen_index] == 1
-            and barrel.ml_per_barrel <= max_barrel_capacity
-        ),
-        key=lambda b: b.price,
-        default=None,
-    )
+            if int(barrel.ml_per_barrel * barrel.potion_type[color_idx]) > 0
+        ]
 
-    if cheapest_chosen_barrel and cheapest_chosen_barrel.price <= gold:
-        return [BarrelOrder(sku=cheapest_chosen_barrel.sku, quantity=1)]
+        # Prioritize barrels that provide the most of the current scarce color.
+        eligible_barrels.sort(
+            key=lambda barrel: (
+                int(barrel.ml_per_barrel * barrel.potion_type[color_idx]),
+                -barrel.price,
+            ),
+            reverse=True,
+        )
 
-    # return an empty list if no affordable barrel is found
-    return []
+        for barrel in eligible_barrels:
+            if barrel.price <= 0:
+                continue
+
+            max_by_gold = remaining_gold // barrel.price
+            max_by_capacity = remaining_capacity // barrel.ml_per_barrel
+            quantity_to_buy = min(
+                remaining_quantity_by_sku[barrel.sku], max_by_gold, max_by_capacity
+            )
+
+            if quantity_to_buy <= 0:
+                continue
+
+            orders.append(BarrelOrder(sku=barrel.sku, quantity=quantity_to_buy))
+            remaining_quantity_by_sku[barrel.sku] -= quantity_to_buy
+            remaining_gold -= quantity_to_buy * barrel.price
+            remaining_capacity -= quantity_to_buy * barrel.ml_per_barrel
+
+            if remaining_gold <= 0 or remaining_capacity <= 0:
+                return orders
+
+    return orders
 
 
 @router.post("/plan", response_model=List[BarrelOrder])
@@ -176,11 +195,7 @@ def get_wholesale_purchase_plan(wholesale_catalog: List[Barrel]):
         green_ml = result.green_ml
         blue_ml = result.blue_ml
         dark_ml = result.dark_ml
-        red_potions = result.red_potions
-        green_potions = result.green_potions
-        blue_potions = result.blue_potions
-        dark_potions = result.dark_potions
-
+        
     # TODO: fill in values correctly based on what is in your database
     return create_barrel_plan(
         gold=gold,
@@ -189,9 +204,5 @@ def get_wholesale_purchase_plan(wholesale_catalog: List[Barrel]):
         current_green_ml=green_ml,
         current_blue_ml=blue_ml,
         current_dark_ml=dark_ml,
-        current_red_potions=red_potions,
-        current_green_potions=green_potions,
-        current_blue_potions=blue_potions,
-        current_dark_potions=dark_potions,
         wholesale_catalog=wholesale_catalog,
     )
