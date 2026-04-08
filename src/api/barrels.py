@@ -195,7 +195,7 @@ def get_wholesale_purchase_plan(wholesale_catalog: List[Barrel]):
         green_ml = result.green_ml
         blue_ml = result.blue_ml
         dark_ml = result.dark_ml
-        
+
     # TODO: fill in values correctly based on what is in your database
     return create_barrel_plan(
         gold=gold,
