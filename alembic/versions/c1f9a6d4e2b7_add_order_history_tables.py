@@ -30,14 +30,23 @@ def upgrade() -> None:
         sa.Column("character_level", sa.Integer(), nullable=False),
         sa.Column("total_potions_bought", sa.Integer(), nullable=False),
         sa.Column("total_gold_paid", sa.Integer(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
     )
 
     op.create_table(
         "order_history_items",
         sa.Column("id", sa.Integer(), primary_key=True),
-        sa.Column("order_id", sa.Integer(), sa.ForeignKey("order_history.id"), nullable=False),
-        sa.Column("potion_id", sa.Integer(), sa.ForeignKey("potions.id"), nullable=False),
+        sa.Column(
+            "order_id", sa.Integer(), sa.ForeignKey("order_history.id"), nullable=False
+        ),
+        sa.Column(
+            "potion_id", sa.Integer(), sa.ForeignKey("potions.id"), nullable=False
+        ),
         sa.Column("potion_sku", sa.String(), nullable=False),
         sa.Column("quantity", sa.Integer(), nullable=False),
         sa.Column("unit_price", sa.Integer(), nullable=False),
