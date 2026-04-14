@@ -68,6 +68,36 @@ def post_deliver_bottles(potions_delivered: List[PotionMixes], order_id: int):
                     ),
                     {"qty": quantity, "id": potion_id},
                 )
+            else:
+                # If this recipe is new, create it and seed quantity on hand.
+                generated_sku = (
+                    f"MIX_{recipe[0]}_{recipe[1]}_{recipe[2]}_{recipe[3]}"
+                )
+                generated_name = (
+                    f"Custom Mix {recipe[0]}-{recipe[1]}-{recipe[2]}-{recipe[3]}"
+                )
+                connection.execute(
+                    sqlalchemy.text(
+                        """
+                        INSERT INTO potions
+                            (sku, name, quantity_on_hand, price, red_ml, green_ml, blue_ml, dark_ml)
+                        VALUES
+                            (:sku, :name, :quantity, :price, :red_ml, :green_ml, :blue_ml, :dark_ml)
+                        ON CONFLICT (sku)
+                        DO UPDATE SET quantity_on_hand = potions.quantity_on_hand + EXCLUDED.quantity_on_hand
+                        """
+                    ),
+                    {
+                        "sku": generated_sku,
+                        "name": generated_name,
+                        "quantity": quantity,
+                        "price": 50,
+                        "red_ml": recipe[0],
+                        "green_ml": recipe[1],
+                        "blue_ml": recipe[2],
+                        "dark_ml": recipe[3],
+                    },
+                )
 
             # Deduct ml from global_inventory based on recipe used
             connection.execute(
