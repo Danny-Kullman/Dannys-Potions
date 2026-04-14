@@ -13,7 +13,7 @@ router = APIRouter(
 
 
 class PotionMixes(BaseModel):
-    potion_type: List[float] = Field(
+    potion_type: List[int] = Field(
         ...,
         min_length=4,
         max_length=4,
@@ -25,9 +25,9 @@ class PotionMixes(BaseModel):
 
     @field_validator("potion_type")
     @classmethod
-    def validate_potion_type(cls, potion_type: List[float]) -> List[float]:
-        if sum(potion_type) != 1.0:
-            raise ValueError("Sum of potion_type values must be exactly 1.0")
+    def validate_potion_type(cls, potion_type: List[int]) -> List[int]:
+        if sum(potion_type) != 100:
+            raise ValueError("Sum of potion_type values must be exactly 100")
         return potion_type
 
 
@@ -52,10 +52,10 @@ def post_deliver_bottles(potions_delivered: List[PotionMixes], order_id: int):
                          AND blue_ml = :blue_ml AND dark_ml = :dark_ml"""
                 ),
                 {
-                    "red_ml": recipe[0] * 100,
-                    "green_ml": recipe[1] * 100,
-                    "blue_ml": recipe[2] * 100,
-                    "dark_ml": recipe[3] * 100,
+                    "red_ml": recipe[0],
+                    "green_ml": recipe[1],
+                    "blue_ml": recipe[2],
+                    "dark_ml": recipe[3],
                 },
             ).fetchone()
 

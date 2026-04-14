@@ -10,11 +10,11 @@ def test_bottle_red_potions() -> None:
 
     # Test with the standard recipes from the potions table seed
     recipes = [
-        (0.1, 0, 0, 0),  # Red
-        (0, 0.1, 0, 0),  # Green
-        (0, 0, 0.1, 0),  # Blue
-        (0, 0, 0, 0.1),  # Dark
-        (0.05, 0, 0.05, 0),  # Purple
+        (100, 0, 0, 0),  # Red
+        (0, 100, 0, 0),  # Green
+        (0, 0, 100, 0),  # Blue
+        (0, 0, 0, 100),  # Dark
+        (50, 0, 50, 0),  # Purple
     ]
 
     result = create_bottle_plan(
@@ -27,5 +27,5 @@ def test_bottle_red_potions() -> None:
     )
 
     assert len(result) == 1
-    assert result[0].potion_type == [0.1, 0, 0, 0]
+    assert result[0].potion_type == [100, 0, 0, 0]
     assert result[0].quantity == 1

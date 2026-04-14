@@ -12,7 +12,7 @@ class CatalogItem(BaseModel):
     name: str
     quantity: Annotated[int, Field(ge=1, le=10000)]
     price: Annotated[int, Field(ge=1, le=500)]
-    potion_type: List[float] = Field(
+    potion_type: List[int] = Field(
         ...,
         min_length=4,
         max_length=4,
@@ -40,10 +40,10 @@ def create_catalog() -> List[CatalogItem]:
                     quantity=row.quantity_on_hand,
                     price=row.price,
                     potion_type=[
-                        row.red_ml / 100,
-                        row.green_ml / 100,
-                        row.blue_ml / 100,
-                        row.dark_ml / 100,
+                        row.red_ml,
+                        row.green_ml,
+                        row.blue_ml,
+                        row.dark_ml,
                     ],
                 )
             )
