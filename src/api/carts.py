@@ -234,7 +234,12 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
         for item in cart_items:
             connection.execute(
                 sqlalchemy.text(
-                    "UPDATE potions SET quantity_on_hand = quantity_on_hand - :quantity WHERE id = :potion_id"
+                    """
+                    UPDATE potions
+                    SET quantity_on_hand = quantity_on_hand - :quantity,
+                        amount_sold = amount_sold + :quantity
+                    WHERE id = :potion_id
+                    """
                 ),
                 {"quantity": item.quantity, "potion_id": item.id},
             )

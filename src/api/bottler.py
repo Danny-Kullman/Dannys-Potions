@@ -70,9 +70,7 @@ def post_deliver_bottles(potions_delivered: List[PotionMixes], order_id: int):
                 )
             else:
                 # If this recipe is new, create it and seed quantity on hand.
-                generated_sku = (
-                    f"MIX_{recipe[0]}_{recipe[1]}_{recipe[2]}_{recipe[3]}"
-                )
+                generated_sku = f"MIX_{recipe[0]}_{recipe[1]}_{recipe[2]}_{recipe[3]}"
                 generated_name = (
                     f"Custom Mix {recipe[0]}-{recipe[1]}-{recipe[2]}-{recipe[3]}"
                 )
