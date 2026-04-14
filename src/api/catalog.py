@@ -30,16 +30,23 @@ def create_catalog() -> List[CatalogItem]:
                 ORDER BY price ASC"""
             )
         ).fetchall()
-        
+
         catalog = []
         for row in result:
-            catalog.append(CatalogItem(
-                sku=row.sku,
-                name=row.name,
-                quantity=row.quantity_on_hand,
-                price=row.price,
-                potion_type=[row.red_ml/100, row.green_ml/100, row.blue_ml/100, row.dark_ml/100]
-            ))
+            catalog.append(
+                CatalogItem(
+                    sku=row.sku,
+                    name=row.name,
+                    quantity=row.quantity_on_hand,
+                    price=row.price,
+                    potion_type=[
+                        row.red_ml / 100,
+                        row.green_ml / 100,
+                        row.blue_ml / 100,
+                        row.dark_ml / 100,
+                    ],
+                )
+            )
         return catalog
 
 

@@ -185,7 +185,7 @@ def get_wholesale_purchase_plan(wholesale_catalog: List[Barrel]):
     """
     print(f"barrel catalog: {wholesale_catalog}")
 
-    sql_to_execute = """ SELECT gold, max_barrel_capacity - (red_ml + green_ml + blue_ml + dark_ml) AS remaining_barrel_capacity, red_ml, green_ml, blue_ml, dark_ml, red_potions, green_potions, blue_potions, dark_potions FROM global_inventory """
+    sql_to_execute = """ SELECT gold, max_barrel_capacity - (red_ml + green_ml + blue_ml + dark_ml) AS remaining_barrel_capacity, red_ml, green_ml, blue_ml, dark_ml FROM global_inventory """
 
     with db.engine.begin() as connection:
         result = connection.execute(sqlalchemy.text(sql_to_execute)).one()

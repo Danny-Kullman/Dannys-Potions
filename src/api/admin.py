@@ -20,9 +20,7 @@ def reset():
     with db.engine.begin() as connection:
         connection.execute(sqlalchemy.text("DELETE FROM cart_items"))
         connection.execute(sqlalchemy.text("DELETE FROM carts"))
-        connection.execute(
-            sqlalchemy.text("UPDATE potions SET quantity_on_hand = 0")
-        )
+        connection.execute(sqlalchemy.text("UPDATE potions SET quantity_on_hand = 0"))
         connection.execute(
             sqlalchemy.text(
                 """

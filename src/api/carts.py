@@ -110,7 +110,7 @@ def create_cart(new_cart: Customer):
             },
         ).one()
         cart_id = result.id
-    
+
     return CartCreateResponse(cart_id=cart_id)
 
 
@@ -126,21 +126,21 @@ def set_item_quantity(cart_id: int, item_sku: str, cart_item: CartItem):
             sqlalchemy.text("SELECT id FROM carts WHERE id = :cart_id"),
             {"cart_id": cart_id},
         ).fetchone()
-        
+
         if not cart_check:
             raise HTTPException(status_code=404, detail="Cart not found")
-        
+
         # Get potion_id from SKU
         potion_check = connection.execute(
             sqlalchemy.text("SELECT id FROM potions WHERE sku = :sku"),
             {"sku": item_sku},
         ).fetchone()
-        
+
         if not potion_check:
             raise HTTPException(status_code=404, detail="Potion not found")
-        
+
         potion_id = potion_check.id
-        
+
         # Check if item already in cart
         existing = connection.execute(
             sqlalchemy.text(
@@ -148,14 +148,18 @@ def set_item_quantity(cart_id: int, item_sku: str, cart_item: CartItem):
             ),
             {"cart_id": cart_id, "potion_id": potion_id},
         ).fetchone()
-        
+
         if existing:
             # Update quantity
             connection.execute(
                 sqlalchemy.text(
                     "UPDATE cart_items SET quantity = :quantity WHERE cart_id = :cart_id AND potion_id = :potion_id"
                 ),
-                {"quantity": cart_item.quantity, "cart_id": cart_id, "potion_id": potion_id},
+                {
+                    "quantity": cart_item.quantity,
+                    "cart_id": cart_id,
+                    "potion_id": potion_id,
+                },
             )
         else:
             # Insert new item
@@ -163,7 +167,11 @@ def set_item_quantity(cart_id: int, item_sku: str, cart_item: CartItem):
                 sqlalchemy.text(
                     "INSERT INTO cart_items (cart_id, potion_id, quantity) VALUES (:cart_id, :potion_id, :quantity)"
                 ),
-                {"cart_id": cart_id, "potion_id": potion_id, "quantity": cart_item.quantity},
+                {
+                    "cart_id": cart_id,
+                    "potion_id": potion_id,
+                    "quantity": cart_item.quantity,
+                },
             )
 
 
@@ -187,10 +195,10 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
             sqlalchemy.text("SELECT id FROM carts WHERE id = :cart_id"),
             {"cart_id": cart_id},
         ).fetchone()
-        
+
         if not cart_check:
             raise HTTPException(status_code=404, detail="Cart not found")
-        
+
         # Get all items in cart with potion details
         cart_items = connection.execute(
             sqlalchemy.text(
@@ -201,13 +209,13 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
             ),
             {"cart_id": cart_id},
         ).fetchall()
-        
+
         if not cart_items:
             raise HTTPException(status_code=400, detail="Cart is empty")
-        
+
         total_potions_bought = 0
         total_gold_paid = 0
-        
+
         # Calculate totals and verify bottled stock is available.
         for item in cart_items:
             quantity = item.quantity
@@ -215,11 +223,13 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
             quantity_on_hand = item.quantity_on_hand
 
             if quantity_on_hand < quantity:
-                raise HTTPException(status_code=400, detail="Not enough potion inventory")
+                raise HTTPException(
+                    status_code=400, detail="Not enough potion inventory"
+                )
 
             total_potions_bought += quantity
             total_gold_paid += quantity * price
-        
+
         # Decrement potion quantities
         for item in cart_items:
             connection.execute(
@@ -228,7 +238,7 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
                 ),
                 {"quantity": item.quantity, "potion_id": item.id},
             )
-        
+
         # Selling bottled potions should only increase gold.
         connection.execute(
             sqlalchemy.text(
@@ -239,19 +249,19 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
                 "total_gold_paid": total_gold_paid,
             },
         )
-        
+
         # Delete cart items
         connection.execute(
             sqlalchemy.text("DELETE FROM cart_items WHERE cart_id = :cart_id"),
             {"cart_id": cart_id},
         )
-        
+
         # Delete cart
         connection.execute(
             sqlalchemy.text("DELETE FROM carts WHERE id = :cart_id"),
             {"cart_id": cart_id},
         )
-    
+
     return CheckoutResponse(
         total_potions_bought=total_potions_bought, total_gold_paid=total_gold_paid
     )

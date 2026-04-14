@@ -43,7 +43,7 @@ def post_deliver_bottles(potions_delivered: List[PotionMixes], order_id: int):
         for potion_mix in potions_delivered:
             recipe = potion_mix.potion_type
             quantity = potion_mix.quantity
-            
+
             # Find existing potion with this recipe
             result = connection.execute(
                 sqlalchemy.text(
@@ -56,9 +56,9 @@ def post_deliver_bottles(potions_delivered: List[PotionMixes], order_id: int):
                     "green_ml": recipe[1],
                     "blue_ml": recipe[2],
                     "dark_ml": recipe[3],
-                }
+                },
             ).fetchone()
-            
+
             if result:
                 potion_id = result.id
                 # Increment quantity on hand
@@ -66,9 +66,9 @@ def post_deliver_bottles(potions_delivered: List[PotionMixes], order_id: int):
                     sqlalchemy.text(
                         "UPDATE potions SET quantity_on_hand = quantity_on_hand + :qty WHERE id = :id"
                     ),
-                    {"qty": quantity, "id": potion_id}
+                    {"qty": quantity, "id": potion_id},
                 )
-            
+
             # Deduct ml from global_inventory based on recipe used
             connection.execute(
                 sqlalchemy.text(
@@ -83,7 +83,7 @@ def post_deliver_bottles(potions_delivered: List[PotionMixes], order_id: int):
                     "green_used": recipe[1] * quantity,
                     "blue_used": recipe[2] * quantity,
                     "dark_used": recipe[3] * quantity,
-                }
+                },
             )
 
 
@@ -105,26 +105,24 @@ def create_bottle_plan(
     for recipe in recipes:
         if remaining_potion_capacity <= 0:
             break
-        
+
         red_needed, green_needed, blue_needed, dark_needed = recipe
-        
+
         # Calculate how many we can make of this recipe
-        max_by_red = red_ml // red_needed if red_needed > 0 else float('inf')
-        max_by_green = green_ml // green_needed if green_needed > 0 else float('inf')
-        max_by_blue = blue_ml // blue_needed if blue_needed > 0 else float('inf')
-        max_by_dark = dark_ml // dark_needed if dark_needed > 0 else float('inf')
-        
+        max_by_red = red_ml // red_needed if red_needed > 0 else float("inf")
+        max_by_green = green_ml // green_needed if green_needed > 0 else float("inf")
+        max_by_blue = blue_ml // blue_needed if blue_needed > 0 else float("inf")
+        max_by_dark = dark_ml // dark_needed if dark_needed > 0 else float("inf")
+
         max_brewable = int(min(max_by_red, max_by_green, max_by_blue, max_by_dark))
-        
+
         if max_brewable <= 0:
             continue
-        
+
         quantity_to_bottle = min(max_brewable, remaining_potion_capacity)
-        
-        plan.append(
-            PotionMixes(potion_type=list(recipe), quantity=quantity_to_bottle)
-        )
-        
+
+        plan.append(PotionMixes(potion_type=list(recipe), quantity=quantity_to_bottle))
+
         red_ml -= red_needed * quantity_to_bottle
         green_ml -= green_needed * quantity_to_bottle
         blue_ml -= blue_needed * quantity_to_bottle
@@ -157,7 +155,7 @@ def get_bottle_plan():
         green_ml = result.green_ml
         blue_ml = result.blue_ml
         dark_ml = result.dark_ml
-        
+
         # Get all available recipes from potions table, ordered by price (highest first)
         recipes = connection.execute(
             sqlalchemy.text(
@@ -165,7 +163,7 @@ def get_bottle_plan():
                    FROM potions ORDER BY price DESC"""
             )
         ).fetchall()
-        
+
         # Convert to list of tuples for create_bottle_plan (sorted by value/price)
         recipe_list = [(r.red_ml, r.green_ml, r.blue_ml, r.dark_ml) for r in recipes]
 

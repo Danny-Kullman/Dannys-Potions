@@ -7,14 +7,14 @@ def test_bottle_red_potions() -> None:
     blue_ml: int = 0
     dark_ml: int = 0
     maximum_potion_capacity: int = 1000
-    
+
     # Test with the standard recipes from the potions table seed
     recipes = [
-        (100, 0, 0, 0),    # Red
-        (0, 100, 0, 0),    # Green
-        (0, 0, 100, 0),    # Blue
-        (0, 0, 0, 100),    # Dark
-        (50, 0, 50, 0),    # Purple
+        (100, 0, 0, 0),  # Red
+        (0, 100, 0, 0),  # Green
+        (0, 0, 100, 0),  # Blue
+        (0, 0, 0, 100),  # Dark
+        (50, 0, 50, 0),  # Purple
     ]
 
     result = create_bottle_plan(

@@ -48,7 +48,12 @@ def get_inventory():
 
         gold = inventory.gold
         total_potions = potions[0]
-        total_ml = inventory.red_ml + inventory.green_ml + inventory.blue_ml + inventory.dark_ml
+        total_ml = (
+            inventory.red_ml
+            + inventory.green_ml
+            + inventory.blue_ml
+            + inventory.dark_ml
+        )
 
     return InventoryAudit(
         number_of_potions=total_potions,
@@ -64,7 +69,6 @@ def get_capacity_plan():
     - Prioritize the more limiting resource first
     """
     with db.engine.begin() as connection:
-
         inventory = connection.execute(
             sqlalchemy.text(
                 """SELECT gold, red_ml, green_ml, blue_ml, dark_ml,
@@ -72,41 +76,45 @@ def get_capacity_plan():
                    FROM global_inventory"""
             )
         ).one()
-        
+
         potions_result = connection.execute(
             sqlalchemy.text("SELECT COALESCE(SUM(quantity_on_hand), 0) FROM potions")
         ).one()
-        
+
         gold = inventory.gold
-        total_ml = inventory.red_ml + inventory.green_ml + inventory.blue_ml + inventory.dark_ml
+        total_ml = (
+            inventory.red_ml
+            + inventory.green_ml
+            + inventory.blue_ml
+            + inventory.dark_ml
+        )
         total_potions = potions_result[0]
         max_potion_capacity = inventory.max_potion_capacity
         max_ml_capacity = inventory.max_barrel_capacity
-        
+
         # Current capacity in units (1 unit = 50 potions or 10000 ml)
         current_potion_units = max_potion_capacity // 50
         current_ml_units = max_ml_capacity // 10000
-        
+
         # Utilization percentages
         potion_utilization = total_potions / max_potion_capacity
         ml_utilization = total_ml / max_ml_capacity
-        
+
         # Capacity purchases
         potion_capacity_purchase = 0
         ml_capacity_purchase = 0
-        
+
         # Buy 1 unit if >80% utilized, up to 10 units total
         if potion_utilization > 0.8 and current_potion_units < 10 and gold >= 1000:
             potion_capacity_purchase = 1
             gold -= 1000
-        
+
         if ml_utilization > 0.8 and current_ml_units < 10 and gold >= 1000:
             ml_capacity_purchase = 1
             gold -= 1000
-    
+
     return CapacityPlan(
-        potion_capacity=potion_capacity_purchase,
-        ml_capacity=ml_capacity_purchase
+        potion_capacity=potion_capacity_purchase, ml_capacity=ml_capacity_purchase
     )
 
 
@@ -119,8 +127,10 @@ def deliver_capacity_plan(capacity_purchase: CapacityPlan, order_id: int):
     - Start with 1 capacity for 50 potions and 1 capacity for 10,000 ml of potion.
     - Each additional capacity unit costs 1000 gold.
     """
-    total_cost = (capacity_purchase.potion_capacity + capacity_purchase.ml_capacity) * 1000
-    
+    total_cost = (
+        capacity_purchase.potion_capacity + capacity_purchase.ml_capacity
+    ) * 1000
+
     with db.engine.begin() as connection:
         # Deduct gold and increase capacity
         connection.execute(
