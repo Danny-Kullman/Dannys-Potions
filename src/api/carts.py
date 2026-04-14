@@ -194,7 +194,7 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
         # Get all items in cart with potion details
         cart_items = connection.execute(
             sqlalchemy.text(
-                """SELECT ci.quantity, p.id, p.price, p.red_ml, p.green_ml, p.blue_ml, p.dark_ml
+                """SELECT ci.quantity, p.id, p.price, p.quantity_on_hand
                    FROM cart_items ci
                    JOIN potions p ON ci.potion_id = p.id
                    WHERE ci.cart_id = :cart_id"""
@@ -207,34 +207,18 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
         
         total_potions_bought = 0
         total_gold_paid = 0
-        total_red_ml = 0
-        total_green_ml = 0
-        total_blue_ml = 0
-        total_dark_ml = 0
         
-        # Calculate totals and check inventory
+        # Calculate totals and verify bottled stock is available.
         for item in cart_items:
             quantity = item.quantity
             price = item.price
+            quantity_on_hand = item.quantity_on_hand
+
+            if quantity_on_hand < quantity:
+                raise HTTPException(status_code=400, detail="Not enough potion inventory")
+
             total_potions_bought += quantity
             total_gold_paid += quantity * price
-            total_red_ml += item.red_ml * quantity
-            total_green_ml += item.green_ml * quantity
-            total_blue_ml += item.blue_ml * quantity
-            total_dark_ml += item.dark_ml * quantity
-        
-        # Check global inventory has enough ml
-        inventory = connection.execute(
-            sqlalchemy.text(
-                "SELECT red_ml, green_ml, blue_ml, dark_ml FROM global_inventory"
-            )
-        ).one()
-        
-        if (inventory.red_ml < total_red_ml or 
-            inventory.green_ml < total_green_ml or
-            inventory.blue_ml < total_blue_ml or
-            inventory.dark_ml < total_dark_ml):
-            raise HTTPException(status_code=400, detail="Not enough potions in inventory")
         
         # Decrement potion quantities
         for item in cart_items:
@@ -245,22 +229,14 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
                 {"quantity": item.quantity, "potion_id": item.id},
             )
         
-        # Update global inventory: add gold, decrement ml
+        # Selling bottled potions should only increase gold.
         connection.execute(
             sqlalchemy.text(
                 """UPDATE global_inventory SET 
-                   gold = gold + :total_gold_paid,
-                   red_ml = red_ml - :total_red_ml,
-                   green_ml = green_ml - :total_green_ml,
-                   blue_ml = blue_ml - :total_blue_ml,
-                   dark_ml = dark_ml - :total_dark_ml"""
+                   gold = gold + :total_gold_paid"""
             ),
             {
                 "total_gold_paid": total_gold_paid,
-                "total_red_ml": total_red_ml,
-                "total_green_ml": total_green_ml,
-                "total_blue_ml": total_blue_ml,
-                "total_dark_ml": total_dark_ml,
             },
         )
         

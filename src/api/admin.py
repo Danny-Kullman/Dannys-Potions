@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, status
 import sqlalchemy
 from src.api import auth
-from src.api import carts
 from src import database as db
 
 router = APIRouter(
@@ -19,6 +18,11 @@ def reset():
     """
 
     with db.engine.begin() as connection:
+        connection.execute(sqlalchemy.text("DELETE FROM cart_items"))
+        connection.execute(sqlalchemy.text("DELETE FROM carts"))
+        connection.execute(
+            sqlalchemy.text("UPDATE potions SET quantity_on_hand = 0")
+        )
         connection.execute(
             sqlalchemy.text(
                 """
@@ -27,14 +31,7 @@ def reset():
                 red_ml = 0,
                 green_ml = 0,
                 blue_ml = 0,
-                dark_ml = 0,
-                red_potions = 0,
-                green_potions = 0,
-                blue_potions = 0,
-                dark_potions = 0
+                dark_ml = 0
                 """
             )
         )
-
-    carts.carts.clear()
-    carts.cart_id_counter = 1
