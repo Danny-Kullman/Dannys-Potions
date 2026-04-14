@@ -192,7 +192,13 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
     with db.engine.begin() as connection:
         # Check if cart exists
         cart_check = connection.execute(
-            sqlalchemy.text("SELECT id FROM carts WHERE id = :cart_id"),
+            sqlalchemy.text(
+                """
+                SELECT id, customer_id, customer_name, character_class, character_species, character_level
+                FROM carts
+                WHERE id = :cart_id
+                """
+            ),
             {"cart_id": cart_id},
         ).fetchone()
 
@@ -202,7 +208,7 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
         # Get all items in cart with potion details
         cart_items = connection.execute(
             sqlalchemy.text(
-                """SELECT ci.quantity, p.id, p.price, p.quantity_on_hand
+                """SELECT ci.quantity, p.id, p.sku, p.price, p.quantity_on_hand
                    FROM cart_items ci
                    JOIN potions p ON ci.potion_id = p.id
                    WHERE ci.cart_id = :cart_id"""
@@ -230,6 +236,31 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
             total_potions_bought += quantity
             total_gold_paid += quantity * price
 
+        # Persist the checkout as a historical order for reporting/analytics.
+        order_row = connection.execute(
+            sqlalchemy.text(
+                """
+                INSERT INTO order_history
+                    (customer_id, customer_name, character_class, character_species, character_level,
+                     total_potions_bought, total_gold_paid)
+                VALUES
+                    (:customer_id, :customer_name, :character_class, :character_species, :character_level,
+                     :total_potions_bought, :total_gold_paid)
+                RETURNING id
+                """
+            ),
+            {
+                "customer_id": cart_check.customer_id,
+                "customer_name": cart_check.customer_name,
+                "character_class": cart_check.character_class,
+                "character_species": cart_check.character_species,
+                "character_level": cart_check.character_level,
+                "total_potions_bought": total_potions_bought,
+                "total_gold_paid": total_gold_paid,
+            },
+        ).one()
+        order_id = order_row.id
+
         # Decrement potion quantities
         for item in cart_items:
             connection.execute(
@@ -242,6 +273,24 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
                     """
                 ),
                 {"quantity": item.quantity, "potion_id": item.id},
+            )
+            connection.execute(
+                sqlalchemy.text(
+                    """
+                    INSERT INTO order_history_items
+                        (order_id, potion_id, potion_sku, quantity, unit_price, line_total)
+                    VALUES
+                        (:order_id, :potion_id, :potion_sku, :quantity, :unit_price, :line_total)
+                    """
+                ),
+                {
+                    "order_id": order_id,
+                    "potion_id": item.id,
+                    "potion_sku": item.sku,
+                    "quantity": item.quantity,
+                    "unit_price": item.price,
+                    "line_total": item.quantity * item.price,
+                },
             )
 
         # Selling bottled potions should only increase gold.
