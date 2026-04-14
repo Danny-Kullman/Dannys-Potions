@@ -12,7 +12,7 @@ class CatalogItem(BaseModel):
     name: str
     quantity: Annotated[int, Field(ge=1, le=10000)]
     price: Annotated[int, Field(ge=1, le=500)]
-    potion_type: List[int] = Field(
+    potion_type: List[float] = Field(
         ...,
         min_length=4,
         max_length=4,
