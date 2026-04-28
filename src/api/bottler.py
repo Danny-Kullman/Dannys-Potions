@@ -39,7 +39,37 @@ def post_deliver_bottles(potions_delivered: List[PotionMixes], order_id: int):
     """
     print(f"potions delivered: {potions_delivered} order_id: {order_id}")
 
+    request_id = f"bottler_deliver_{order_id}"
+
     with db.engine.begin() as connection:
+        # Check if this request has already been processed
+        existing_request = connection.execute(
+            sqlalchemy.text(
+                "SELECT request_id FROM processed_requests WHERE request_id = :request_id"
+            ),
+            {"request_id": request_id},
+        ).fetchone()
+
+        if existing_request:
+            # Already processed, return without doing anything
+            return
+
+        # Create a potion transaction
+        potion_transaction = connection.execute(
+            sqlalchemy.text(
+                """INSERT INTO potion_transactions (description) 
+                   VALUES (:description) 
+                   RETURNING id"""
+            ),
+            {"description": f"Bottled {sum(p.quantity for p in potions_delivered)} potions"},
+        ).one()
+        potion_transaction_id = potion_transaction.id
+
+        total_red_used = 0
+        total_green_used = 0
+        total_blue_used = 0
+        total_dark_used = 0
+
         for potion_mix in potions_delivered:
             recipe = potion_mix.potion_type
             quantity = potion_mix.quantity
@@ -61,20 +91,13 @@ def post_deliver_bottles(potions_delivered: List[PotionMixes], order_id: int):
 
             if result:
                 potion_id = result.id
-                # Increment quantity on hand
-                connection.execute(
-                    sqlalchemy.text(
-                        "UPDATE potions SET quantity_on_hand = quantity_on_hand + :qty WHERE id = :id"
-                    ),
-                    {"qty": quantity, "id": potion_id},
-                )
             else:
-                # If this recipe is new, create it and seed quantity on hand.
+                # If this recipe is new, create it
                 generated_sku = f"MIX_{recipe[0]}_{recipe[1]}_{recipe[2]}_{recipe[3]}"
                 generated_name = (
                     f"Custom Mix {recipe[0]}-{recipe[1]}-{recipe[2]}-{recipe[3]}"
                 )
-                connection.execute(
+                result = connection.execute(
                     sqlalchemy.text(
                         """
                         INSERT INTO potions
@@ -83,36 +106,90 @@ def post_deliver_bottles(potions_delivered: List[PotionMixes], order_id: int):
                             (:sku, :name, :quantity, :price, :red_ml, :green_ml, :blue_ml, :dark_ml)
                         ON CONFLICT (sku)
                         DO UPDATE SET quantity_on_hand = potions.quantity_on_hand + EXCLUDED.quantity_on_hand
+                        RETURNING id
                         """
                     ),
                     {
                         "sku": generated_sku,
                         "name": generated_name,
-                        "quantity": quantity,
+                        "quantity": 0,  # Don't use quantity_on_hand anymore, use ledger
                         "price": 50,
                         "red_ml": recipe[0],
                         "green_ml": recipe[1],
                         "blue_ml": recipe[2],
                         "dark_ml": recipe[3],
                     },
-                )
+                ).one()
+                potion_id = result.id
 
-            # Deduct ml from global_inventory based on recipe used
+            # Add potion ledger entry (positive because we're adding potions)
             connection.execute(
                 sqlalchemy.text(
-                    """UPDATE global_inventory SET 
-                       red_ml = red_ml - :red_used,
-                       green_ml = green_ml - :green_used,
-                       blue_ml = blue_ml - :blue_used,
-                       dark_ml = dark_ml - :dark_used"""
+                    """INSERT INTO potion_ledger_entries (potion_id, potion_transaction_id, change) 
+                       VALUES (:potion_id, :transaction_id, :change)"""
                 ),
-                {
-                    "red_used": recipe[0] * quantity,
-                    "green_used": recipe[1] * quantity,
-                    "blue_used": recipe[2] * quantity,
-                    "dark_used": recipe[3] * quantity,
-                },
+                {"potion_id": potion_id, "transaction_id": potion_transaction_id, "change": quantity},
             )
+
+            # Track ml used
+            total_red_used += recipe[0] * quantity
+            total_green_used += recipe[1] * quantity
+            total_blue_used += recipe[2] * quantity
+            total_dark_used += recipe[3] * quantity
+
+        # Create an ml transaction for the deduction
+        ml_transaction = connection.execute(
+            sqlalchemy.text(
+                """INSERT INTO ml_transactions (description) 
+                   VALUES (:description) 
+                   RETURNING id"""
+            ),
+            {"description": f"Used ML to bottle potions"},
+        ).one()
+        ml_transaction_id = ml_transaction.id
+
+        # Add ml ledger entries for each color used (negative because we're removing ml)
+        if total_red_used > 0:
+            connection.execute(
+                sqlalchemy.text(
+                    """INSERT INTO ml_ledger_entries (ml_transaction_id, color, change) 
+                       VALUES (:transaction_id, :color, :change)"""
+                ),
+                {"transaction_id": ml_transaction_id, "color": "red", "change": -total_red_used},
+            )
+        if total_green_used > 0:
+            connection.execute(
+                sqlalchemy.text(
+                    """INSERT INTO ml_ledger_entries (ml_transaction_id, color, change) 
+                       VALUES (:transaction_id, :color, :change)"""
+                ),
+                {"transaction_id": ml_transaction_id, "color": "green", "change": -total_green_used},
+            )
+        if total_blue_used > 0:
+            connection.execute(
+                sqlalchemy.text(
+                    """INSERT INTO ml_ledger_entries (ml_transaction_id, color, change) 
+                       VALUES (:transaction_id, :color, :change)"""
+                ),
+                {"transaction_id": ml_transaction_id, "color": "blue", "change": -total_blue_used},
+            )
+        if total_dark_used > 0:
+            connection.execute(
+                sqlalchemy.text(
+                    """INSERT INTO ml_ledger_entries (ml_transaction_id, color, change) 
+                       VALUES (:transaction_id, :color, :change)"""
+                ),
+                {"transaction_id": ml_transaction_id, "color": "dark", "change": -total_dark_used},
+            )
+
+        # Store the processed request
+        connection.execute(
+            sqlalchemy.text(
+                """INSERT INTO processed_requests (request_id, response) 
+                   VALUES (:request_id, :response)"""
+            ),
+            {"request_id": request_id, "response": sqlalchemy.JSON.cache_ok},
+        )
 
 
 def create_bottle_plan(
@@ -167,22 +244,43 @@ def get_bottle_plan():
     Loads available recipes from the potions table and calculates optimal bottling plan.
     """
     with db.engine.begin() as connection:
-        # Get ml available and total potion capacity
-        result = connection.execute(
+        # Get ml available from ledger
+        ml_result = connection.execute(
             sqlalchemy.text(
-                """SELECT g.max_potion_capacity - COALESCE(SUM(p.quantity_on_hand), 0) AS remaining_potion_capacity,
-                          g.red_ml, g.green_ml, g.blue_ml, g.dark_ml
-                   FROM global_inventory g
-                   LEFT JOIN potions p ON TRUE
-                   GROUP BY g.id, g.max_potion_capacity, g.red_ml, g.green_ml, g.blue_ml, g.dark_ml"""
+                """SELECT 
+                   COALESCE(SUM(CASE WHEN color = 'red' THEN change ELSE 0 END), 0) as red_ml,
+                   COALESCE(SUM(CASE WHEN color = 'green' THEN change ELSE 0 END), 0) as green_ml,
+                   COALESCE(SUM(CASE WHEN color = 'blue' THEN change ELSE 0 END), 0) as blue_ml,
+                   COALESCE(SUM(CASE WHEN color = 'dark' THEN change ELSE 0 END), 0) as dark_ml
+                FROM ml_ledger_entries"""
             )
         ).one()
 
-        remaining_potion_capacity = result.remaining_potion_capacity
-        red_ml = result.red_ml
-        green_ml = result.green_ml
-        blue_ml = result.blue_ml
-        dark_ml = result.dark_ml
+        # Get potion quantities from ledger
+        potion_quantities = connection.execute(
+            sqlalchemy.text(
+                """SELECT potion_id, COALESCE(SUM(change), 0) as quantity_on_hand
+                   FROM potion_ledger_entries
+                   GROUP BY potion_id"""
+            )
+        ).fetchall()
+
+        # Calculate total potion capacity used
+        total_potions = sum(p.quantity_on_hand for p in potion_quantities)
+
+        # Get max potion capacity
+        capacity_result = connection.execute(
+            sqlalchemy.text(
+                "SELECT max_potion_capacity FROM global_inventory"
+            )
+        ).one()
+
+        remaining_potion_capacity = capacity_result.max_potion_capacity - total_potions
+
+        red_ml = ml_result.red_ml
+        green_ml = ml_result.green_ml
+        blue_ml = ml_result.blue_ml
+        dark_ml = ml_result.dark_ml
 
         # Get all available recipes from potions table, ordered by price (highest first)
         recipes = connection.execute(
