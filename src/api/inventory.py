@@ -131,7 +131,9 @@ def get_capacity_plan():
         current_ml_units = max_ml_capacity // 10000
 
         # Utilization percentages
-        potion_utilization = total_potions / max_potion_capacity if max_potion_capacity > 0 else 0
+        potion_utilization = (
+            total_potions / max_potion_capacity if max_potion_capacity > 0 else 0
+        )
         ml_utilization = total_ml / max_ml_capacity if max_ml_capacity > 0 else 0
 
         # Capacity purchases

@@ -75,7 +75,9 @@ def upgrade() -> None:
             sa.ForeignKey("ml_transactions.id"),
             nullable=False,
         ),
-        sa.Column("color", sa.String(10), nullable=False),  # 'red', 'green', 'blue', 'dark'
+        sa.Column(
+            "color", sa.String(10), nullable=False
+        ),  # 'red', 'green', 'blue', 'dark'
         sa.Column("change", sa.Integer(), nullable=False),
         sa.Column(
             "created_at",
@@ -157,7 +159,12 @@ def upgrade() -> None:
     )
 
     # Create index on processed_requests for faster lookups
-    op.create_index("idx_processed_requests_request_id", "processed_requests", ["request_id"], unique=True)
+    op.create_index(
+        "idx_processed_requests_request_id",
+        "processed_requests",
+        ["request_id"],
+        unique=True,
+    )
 
 
 def downgrade() -> None:

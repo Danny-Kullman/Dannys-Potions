@@ -130,7 +130,11 @@ def post_deliver_barrels(barrels_delivered: List[Barrel], order_id: int):
                     """INSERT INTO ml_ledger_entries (ml_transaction_id, color, change) 
                        VALUES (:transaction_id, :color, :change)"""
                 ),
-                {"transaction_id": ml_transaction_id, "color": "red", "change": delivery.red_ml},
+                {
+                    "transaction_id": ml_transaction_id,
+                    "color": "red",
+                    "change": delivery.red_ml,
+                },
             )
         if delivery.green_ml > 0:
             connection.execute(
@@ -138,7 +142,11 @@ def post_deliver_barrels(barrels_delivered: List[Barrel], order_id: int):
                     """INSERT INTO ml_ledger_entries (ml_transaction_id, color, change) 
                        VALUES (:transaction_id, :color, :change)"""
                 ),
-                {"transaction_id": ml_transaction_id, "color": "green", "change": delivery.green_ml},
+                {
+                    "transaction_id": ml_transaction_id,
+                    "color": "green",
+                    "change": delivery.green_ml,
+                },
             )
         if delivery.blue_ml > 0:
             connection.execute(
@@ -146,7 +154,11 @@ def post_deliver_barrels(barrels_delivered: List[Barrel], order_id: int):
                     """INSERT INTO ml_ledger_entries (ml_transaction_id, color, change) 
                        VALUES (:transaction_id, :color, :change)"""
                 ),
-                {"transaction_id": ml_transaction_id, "color": "blue", "change": delivery.blue_ml},
+                {
+                    "transaction_id": ml_transaction_id,
+                    "color": "blue",
+                    "change": delivery.blue_ml,
+                },
             )
         if delivery.dark_ml > 0:
             connection.execute(
@@ -154,7 +166,11 @@ def post_deliver_barrels(barrels_delivered: List[Barrel], order_id: int):
                     """INSERT INTO ml_ledger_entries (ml_transaction_id, color, change) 
                        VALUES (:transaction_id, :color, :change)"""
                 ),
-                {"transaction_id": ml_transaction_id, "color": "dark", "change": delivery.dark_ml},
+                {
+                    "transaction_id": ml_transaction_id,
+                    "color": "dark",
+                    "change": delivery.dark_ml,
+                },
             )
 
         # Store the processed request
@@ -275,14 +291,17 @@ def get_wholesale_purchase_plan(wholesale_catalog: List[Barrel]):
 
         # Get capacity from global_inventory
         capacity_result = connection.execute(
-            sqlalchemy.text(
-                "SELECT max_barrel_capacity FROM global_inventory"
-            )
+            sqlalchemy.text("SELECT max_barrel_capacity FROM global_inventory")
         ).one()
 
         max_barrel_capacity = capacity_result.max_barrel_capacity
         # Calculate remaining capacity
-        total_ml_used = ml_result.red_ml + ml_result.green_ml + ml_result.blue_ml + ml_result.dark_ml
+        total_ml_used = (
+            ml_result.red_ml
+            + ml_result.green_ml
+            + ml_result.blue_ml
+            + ml_result.dark_ml
+        )
         remaining_barrel_capacity = max_barrel_capacity - total_ml_used
 
         red_ml = ml_result.red_ml

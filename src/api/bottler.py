@@ -61,7 +61,9 @@ def post_deliver_bottles(potions_delivered: List[PotionMixes], order_id: int):
                    VALUES (:description) 
                    RETURNING id"""
             ),
-            {"description": f"Bottled {sum(p.quantity for p in potions_delivered)} potions"},
+            {
+                "description": f"Bottled {sum(p.quantity for p in potions_delivered)} potions"
+            },
         ).one()
         potion_transaction_id = potion_transaction.id
 
@@ -128,7 +130,11 @@ def post_deliver_bottles(potions_delivered: List[PotionMixes], order_id: int):
                     """INSERT INTO potion_ledger_entries (potion_id, potion_transaction_id, change) 
                        VALUES (:potion_id, :transaction_id, :change)"""
                 ),
-                {"potion_id": potion_id, "transaction_id": potion_transaction_id, "change": quantity},
+                {
+                    "potion_id": potion_id,
+                    "transaction_id": potion_transaction_id,
+                    "change": quantity,
+                },
             )
 
             # Track ml used
@@ -155,7 +161,11 @@ def post_deliver_bottles(potions_delivered: List[PotionMixes], order_id: int):
                     """INSERT INTO ml_ledger_entries (ml_transaction_id, color, change) 
                        VALUES (:transaction_id, :color, :change)"""
                 ),
-                {"transaction_id": ml_transaction_id, "color": "red", "change": -total_red_used},
+                {
+                    "transaction_id": ml_transaction_id,
+                    "color": "red",
+                    "change": -total_red_used,
+                },
             )
         if total_green_used > 0:
             connection.execute(
@@ -163,7 +173,11 @@ def post_deliver_bottles(potions_delivered: List[PotionMixes], order_id: int):
                     """INSERT INTO ml_ledger_entries (ml_transaction_id, color, change) 
                        VALUES (:transaction_id, :color, :change)"""
                 ),
-                {"transaction_id": ml_transaction_id, "color": "green", "change": -total_green_used},
+                {
+                    "transaction_id": ml_transaction_id,
+                    "color": "green",
+                    "change": -total_green_used,
+                },
             )
         if total_blue_used > 0:
             connection.execute(
@@ -171,7 +185,11 @@ def post_deliver_bottles(potions_delivered: List[PotionMixes], order_id: int):
                     """INSERT INTO ml_ledger_entries (ml_transaction_id, color, change) 
                        VALUES (:transaction_id, :color, :change)"""
                 ),
-                {"transaction_id": ml_transaction_id, "color": "blue", "change": -total_blue_used},
+                {
+                    "transaction_id": ml_transaction_id,
+                    "color": "blue",
+                    "change": -total_blue_used,
+                },
             )
         if total_dark_used > 0:
             connection.execute(
@@ -179,7 +197,11 @@ def post_deliver_bottles(potions_delivered: List[PotionMixes], order_id: int):
                     """INSERT INTO ml_ledger_entries (ml_transaction_id, color, change) 
                        VALUES (:transaction_id, :color, :change)"""
                 ),
-                {"transaction_id": ml_transaction_id, "color": "dark", "change": -total_dark_used},
+                {
+                    "transaction_id": ml_transaction_id,
+                    "color": "dark",
+                    "change": -total_dark_used,
+                },
             )
 
         # Store the processed request
@@ -270,9 +292,7 @@ def get_bottle_plan():
 
         # Get max potion capacity
         capacity_result = connection.execute(
-            sqlalchemy.text(
-                "SELECT max_potion_capacity FROM global_inventory"
-            )
+            sqlalchemy.text("SELECT max_potion_capacity FROM global_inventory")
         ).one()
 
         remaining_potion_capacity = capacity_result.max_potion_capacity - total_potions
