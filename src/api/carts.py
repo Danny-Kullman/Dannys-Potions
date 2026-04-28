@@ -244,24 +244,11 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
         total_potions_bought = 0
         total_gold_paid = 0
 
-        # Calculate totals and verify bottled stock is available.
+        # Calculate totals.
         for item in cart_items:
             quantity = item.quantity
             price = item.price
             potion_id = item.id
-
-            # Get current quantity from ledger
-            quantity_on_hand = (
-                connection.execute(
-                    sqlalchemy.text(
-                        """SELECT COALESCE(SUM(change), 0) as qty FROM potion_ledger_entries
-                       WHERE potion_id = :potion_id"""
-                    ),
-                    {"potion_id": potion_id},
-                )
-                .one()
-                .qty
-            )
 
             total_potions_bought += quantity
             total_gold_paid += quantity * price
