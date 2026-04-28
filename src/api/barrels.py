@@ -119,7 +119,7 @@ def post_deliver_barrels(barrels_delivered: List[Barrel], order_id: int):
                    VALUES (:description) 
                    RETURNING id"""
             ),
-            {"description": f"Received barrels with ML"},
+            {"description": "Received barrels with ML"},
         ).one()
         ml_transaction_id = ml_transaction.id
 

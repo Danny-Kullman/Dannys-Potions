@@ -144,7 +144,7 @@ def post_deliver_bottles(potions_delivered: List[PotionMixes], order_id: int):
                    VALUES (:description) 
                    RETURNING id"""
             ),
-            {"description": f"Used ML to bottle potions"},
+            {"description": "Used ML to bottle potions"},
         ).one()
         ml_transaction_id = ml_transaction.id
 
