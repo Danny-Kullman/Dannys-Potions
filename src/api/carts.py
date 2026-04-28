@@ -188,8 +188,25 @@ class CartCheckout(BaseModel):
 def checkout(cart_id: int, cart_checkout: CartCheckout):
     """
     Handles the checkout process for a specific cart.
+    The call is idempotent based on cart_id.
     """
+    request_id = f"checkout_{cart_id}"
+
     with db.engine.begin() as connection:
+        # Check if this checkout has already been processed
+        existing_request = connection.execute(
+            sqlalchemy.text(
+                "SELECT response FROM processed_requests WHERE request_id = :request_id"
+            ),
+            {"request_id": request_id},
+        ).fetchone()
+
+        if existing_request:
+            # Already processed, return the stored response
+            import json
+            response_data = existing_request.response if isinstance(existing_request.response, dict) else json.loads(existing_request.response)
+            return CheckoutResponse(**response_data)
+
         # Check if cart exists
         cart_check = connection.execute(
             sqlalchemy.text(
@@ -208,7 +225,7 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
         # Get all items in cart with potion details
         cart_items = connection.execute(
             sqlalchemy.text(
-                """SELECT ci.quantity, p.id, p.sku, p.price, p.quantity_on_hand
+                """SELECT ci.quantity, p.id, p.sku, p.price
                    FROM cart_items ci
                    JOIN potions p ON ci.potion_id = p.id
                    WHERE ci.cart_id = :cart_id"""
@@ -226,7 +243,16 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
         for item in cart_items:
             quantity = item.quantity
             price = item.price
-            quantity_on_hand = item.quantity_on_hand
+            potion_id = item.id
+
+            # Get current quantity from ledger
+            quantity_on_hand = connection.execute(
+                sqlalchemy.text(
+                    """SELECT COALESCE(SUM(change), 0) as qty FROM potion_ledger_entries
+                       WHERE potion_id = :potion_id"""
+                ),
+                {"potion_id": potion_id},
+            ).one().qty
 
             if quantity_on_hand < quantity:
                 raise HTTPException(
@@ -236,16 +262,24 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
             total_potions_bought += quantity
             total_gold_paid += quantity * price
 
+        # Get current hour and day of week
+        time_info = connection.execute(
+            sqlalchemy.text(
+                """SELECT EXTRACT(hour FROM now()) as hour_of_day,
+                          EXTRACT(isodow FROM now()) as day_of_week"""
+            )
+        ).one()
+
         # Persist the checkout as a historical order for reporting/analytics.
         order_row = connection.execute(
             sqlalchemy.text(
                 """
                 INSERT INTO order_history
                     (customer_id, customer_name, character_class, character_species, character_level,
-                     total_potions_bought, total_gold_paid)
+                     total_potions_bought, total_gold_paid, hour_of_day, day_of_week)
                 VALUES
                     (:customer_id, :customer_name, :character_class, :character_species, :character_level,
-                     :total_potions_bought, :total_gold_paid)
+                     :total_potions_bought, :total_gold_paid, :hour_of_day, :day_of_week)
                 RETURNING id
                 """
             ),
@@ -257,23 +291,50 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
                 "character_level": cart_check.character_level,
                 "total_potions_bought": total_potions_bought,
                 "total_gold_paid": total_gold_paid,
+                "hour_of_day": int(time_info.hour_of_day),
+                "day_of_week": int(time_info.day_of_week),
             },
         ).one()
         order_id = order_row.id
 
-        # Decrement potion quantities
+        # Create a potion transaction for the sale
+        potion_transaction = connection.execute(
+            sqlalchemy.text(
+                """INSERT INTO potion_transactions (description) 
+                   VALUES (:description) 
+                   RETURNING id"""
+            ),
+            {"description": f"Sold {total_potions_bought} potions in order {order_id}"},
+        ).one()
+        potion_transaction_id = potion_transaction.id
+
+        # Create a gold transaction for the payment
+        gold_transaction = connection.execute(
+            sqlalchemy.text(
+                """INSERT INTO gold_transactions (description) 
+                   VALUES (:description) 
+                   RETURNING id"""
+            ),
+            {"description": f"Received {total_gold_paid} gold in order {order_id}"},
+        ).one()
+        gold_transaction_id = gold_transaction.id
+
+        # Decrement potion quantities using ledger and record order history items
         for item in cart_items:
+            potion_id = item.id
+            sku = item.sku
+            quantity = item.quantity
+            price = item.price
+
+            # Add potion ledger entry (negative because we're selling)
             connection.execute(
                 sqlalchemy.text(
-                    """
-                    UPDATE potions
-                    SET quantity_on_hand = quantity_on_hand - :quantity,
-                        amount_sold = amount_sold + :quantity
-                    WHERE id = :potion_id
-                    """
+                    """INSERT INTO potion_ledger_entries (potion_id, potion_transaction_id, change) 
+                       VALUES (:potion_id, :transaction_id, :change)"""
                 ),
-                {"quantity": item.quantity, "potion_id": item.id},
+                {"potion_id": potion_id, "transaction_id": potion_transaction_id, "change": -quantity},
             )
+
             connection.execute(
                 sqlalchemy.text(
                     """
@@ -285,23 +346,21 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
                 ),
                 {
                     "order_id": order_id,
-                    "potion_id": item.id,
-                    "potion_sku": item.sku,
-                    "quantity": item.quantity,
-                    "unit_price": item.price,
-                    "line_total": item.quantity * item.price,
+                    "potion_id": potion_id,
+                    "potion_sku": sku,
+                    "quantity": quantity,
+                    "unit_price": price,
+                    "line_total": quantity * price,
                 },
             )
 
-        # Selling bottled potions should only increase gold.
+        # Add gold ledger entry (positive because we're receiving gold)
         connection.execute(
             sqlalchemy.text(
-                """UPDATE global_inventory SET 
-                   gold = gold + :total_gold_paid"""
+                """INSERT INTO gold_ledger_entries (gold_transaction_id, change) 
+                   VALUES (:transaction_id, :change)"""
             ),
-            {
-                "total_gold_paid": total_gold_paid,
-            },
+            {"transaction_id": gold_transaction_id, "change": total_gold_paid},
         )
 
         # Delete cart items
@@ -314,6 +373,19 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
         connection.execute(
             sqlalchemy.text("DELETE FROM carts WHERE id = :cart_id"),
             {"cart_id": cart_id},
+        )
+
+        # Store the processed request
+        response_data = {
+            "total_potions_bought": total_potions_bought,
+            "total_gold_paid": total_gold_paid
+        }
+        connection.execute(
+            sqlalchemy.text(
+                """INSERT INTO processed_requests (request_id, response) 
+                   VALUES (:request_id, :response)"""
+            ),
+            {"request_id": request_id, "response": sqlalchemy.JSON(response_data)},
         )
 
     return CheckoutResponse(
