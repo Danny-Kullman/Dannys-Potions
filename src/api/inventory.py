@@ -33,26 +33,39 @@ def get_inventory():
     """
 
     with db.engine.begin() as connection:
-        # Get ml from global_inventory
-        inventory = connection.execute(
+        # Get gold from ledger (sum all gold ledger entries)
+        gold_result = connection.execute(
             sqlalchemy.text(
-                """SELECT gold, red_ml, green_ml, blue_ml, dark_ml
-                FROM global_inventory"""
+                "SELECT COALESCE(SUM(change), 0) as gold FROM gold_ledger_entries"
+            )
+        ).one()
+        gold = gold_result.gold
+
+        # Get ml amounts from ledger (sum all ml ledger entries by color)
+        ml_result = connection.execute(
+            sqlalchemy.text(
+                """SELECT 
+                   COALESCE(SUM(CASE WHEN color = 'red' THEN change ELSE 0 END), 0) as red_ml,
+                   COALESCE(SUM(CASE WHEN color = 'green' THEN change ELSE 0 END), 0) as green_ml,
+                   COALESCE(SUM(CASE WHEN color = 'blue' THEN change ELSE 0 END), 0) as blue_ml,
+                   COALESCE(SUM(CASE WHEN color = 'dark' THEN change ELSE 0 END), 0) as dark_ml
+                FROM ml_ledger_entries"""
             )
         ).one()
 
-        # Get total potions from potions table
-        potions = connection.execute(
-            sqlalchemy.text("SELECT COALESCE(SUM(quantity_on_hand), 0) FROM potions")
+        # Get total potions from potion ledger
+        potions_result = connection.execute(
+            sqlalchemy.text(
+                "SELECT COALESCE(SUM(change), 0) as total_potions FROM potion_ledger_entries"
+            )
         ).one()
 
-        gold = inventory.gold
-        total_potions = potions[0]
+        total_potions = potions_result.total_potions
         total_ml = (
-            inventory.red_ml
-            + inventory.green_ml
-            + inventory.blue_ml
-            + inventory.dark_ml
+            ml_result.red_ml
+            + ml_result.green_ml
+            + ml_result.blue_ml
+            + ml_result.dark_ml
         )
 
     return InventoryAudit(
@@ -69,36 +82,57 @@ def get_capacity_plan():
     - Prioritize the more limiting resource first
     """
     with db.engine.begin() as connection:
-        inventory = connection.execute(
+        # Get gold from ledger
+        gold_result = connection.execute(
             sqlalchemy.text(
-                """SELECT gold, red_ml, green_ml, blue_ml, dark_ml,
-                          max_potion_capacity, max_barrel_capacity
-                   FROM global_inventory"""
+                "SELECT COALESCE(SUM(change), 0) as gold FROM gold_ledger_entries"
+            )
+        ).one()
+        gold = gold_result.gold
+
+        # Get ml amounts from ledger
+        ml_result = connection.execute(
+            sqlalchemy.text(
+                """SELECT 
+                   COALESCE(SUM(CASE WHEN color = 'red' THEN change ELSE 0 END), 0) as red_ml,
+                   COALESCE(SUM(CASE WHEN color = 'green' THEN change ELSE 0 END), 0) as green_ml,
+                   COALESCE(SUM(CASE WHEN color = 'blue' THEN change ELSE 0 END), 0) as blue_ml,
+                   COALESCE(SUM(CASE WHEN color = 'dark' THEN change ELSE 0 END), 0) as dark_ml
+                FROM ml_ledger_entries"""
             )
         ).one()
 
+        # Get potion count from ledger
         potions_result = connection.execute(
-            sqlalchemy.text("SELECT COALESCE(SUM(quantity_on_hand), 0) FROM potions")
+            sqlalchemy.text(
+                "SELECT COALESCE(SUM(change), 0) as total_potions FROM potion_ledger_entries"
+            )
         ).one()
 
-        gold = inventory.gold
+        # Get capacity limits from global_inventory
+        capacity_result = connection.execute(
+            sqlalchemy.text(
+                "SELECT max_potion_capacity, max_barrel_capacity FROM global_inventory"
+            )
+        ).one()
+
         total_ml = (
-            inventory.red_ml
-            + inventory.green_ml
-            + inventory.blue_ml
-            + inventory.dark_ml
+            ml_result.red_ml
+            + ml_result.green_ml
+            + ml_result.blue_ml
+            + ml_result.dark_ml
         )
-        total_potions = potions_result[0]
-        max_potion_capacity = inventory.max_potion_capacity
-        max_ml_capacity = inventory.max_barrel_capacity
+        total_potions = potions_result.total_potions
+        max_potion_capacity = capacity_result.max_potion_capacity
+        max_ml_capacity = capacity_result.max_barrel_capacity
 
         # Current capacity in units (1 unit = 50 potions or 10000 ml)
         current_potion_units = max_potion_capacity // 50
         current_ml_units = max_ml_capacity // 10000
 
         # Utilization percentages
-        potion_utilization = total_potions / max_potion_capacity
-        ml_utilization = total_ml / max_ml_capacity
+        potion_utilization = total_potions / max_potion_capacity if max_potion_capacity > 0 else 0
+        ml_utilization = total_ml / max_ml_capacity if max_ml_capacity > 0 else 0
 
         # Capacity purchases
         potion_capacity_purchase = 0
@@ -131,19 +165,61 @@ def deliver_capacity_plan(capacity_purchase: CapacityPlan, order_id: int):
         capacity_purchase.potion_capacity + capacity_purchase.ml_capacity
     ) * 1000
 
+    request_id = f"inventory_deliver_{order_id}"
+
     with db.engine.begin() as connection:
-        # Deduct gold and increase capacity
+        # Check if this request has already been processed
+        existing_request = connection.execute(
+            sqlalchemy.text(
+                "SELECT request_id FROM processed_requests WHERE request_id = :request_id"
+            ),
+            {"request_id": request_id},
+        ).fetchone()
+
+        if existing_request:
+            # Already processed, return without doing anything
+            return
+
+        # Create a gold transaction for the capacity cost
+        if total_cost > 0:
+            gold_transaction = connection.execute(
+                sqlalchemy.text(
+                    """INSERT INTO gold_transactions (description) 
+                       VALUES (:description) 
+                       RETURNING id"""
+                ),
+                {"description": f"Bought capacity for {total_cost} gold"},
+            ).one()
+            gold_transaction_id = gold_transaction.id
+
+            # Add gold ledger entry (negative because we're spending gold)
+            connection.execute(
+                sqlalchemy.text(
+                    """INSERT INTO gold_ledger_entries (gold_transaction_id, change) 
+                       VALUES (:transaction_id, :change)"""
+                ),
+                {"transaction_id": gold_transaction_id, "change": -total_cost},
+            )
+
+        # Update global_inventory to increase capacity
         connection.execute(
             sqlalchemy.text(
                 """UPDATE global_inventory SET
-                   gold = gold - :total_cost,
                    max_potion_capacity = max_potion_capacity + :potion_capacity_increase,
                    max_barrel_capacity = max_barrel_capacity + :ml_capacity_increase
                 """
             ),
             {
-                "total_cost": total_cost,
                 "potion_capacity_increase": capacity_purchase.potion_capacity * 50,
                 "ml_capacity_increase": capacity_purchase.ml_capacity * 10000,
             },
+        )
+
+        # Store the processed request
+        connection.execute(
+            sqlalchemy.text(
+                """INSERT INTO processed_requests (request_id, response) 
+                   VALUES (:request_id, :response)"""
+            ),
+            {"request_id": request_id, "response": sqlalchemy.JSON.cache_ok},
         )
