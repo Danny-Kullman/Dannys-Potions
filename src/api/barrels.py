@@ -77,26 +77,93 @@ def post_deliver_barrels(barrels_delivered: List[Barrel], order_id: int):
     print(f"barrels delivered: {barrels_delivered} order_id: {order_id}")
 
     delivery = calculate_barrel_summary(barrels_delivered)
+    request_id = f"barrels_deliver_{order_id}"
 
     with db.engine.begin() as connection:
+        # Check if this request has already been processed
+        existing_request = connection.execute(
+            sqlalchemy.text(
+                "SELECT request_id FROM processed_requests WHERE request_id = :request_id"
+            ),
+            {"request_id": request_id},
+        ).fetchone()
+
+        if existing_request:
+            # Already processed, return without doing anything
+            return
+
+        # Create a gold transaction
+        gold_transaction = connection.execute(
+            sqlalchemy.text(
+                """INSERT INTO gold_transactions (description) 
+                   VALUES (:description) 
+                   RETURNING id"""
+            ),
+            {"description": f"Bought barrels for {delivery.gold_paid} gold"},
+        ).one()
+        gold_transaction_id = gold_transaction.id
+
+        # Add gold ledger entry (negative because we're spending gold)
         connection.execute(
             sqlalchemy.text(
-                """
-                UPDATE global_inventory SET 
-                gold = gold - :gold_paid,
-                red_ml = red_ml + :delivered_red_ml,
-                green_ml = green_ml + :delivered_green_ml,
-                blue_ml = blue_ml + :delivered_blue_ml,
-                dark_ml = dark_ml + :delivered_dark_ml
-                """
+                """INSERT INTO gold_ledger_entries (gold_transaction_id, change) 
+                   VALUES (:transaction_id, :change)"""
             ),
-            {
-                "gold_paid": delivery.gold_paid,
-                "delivered_red_ml": delivery.red_ml,
-                "delivered_green_ml": delivery.green_ml,
-                "delivered_blue_ml": delivery.blue_ml,
-                "delivered_dark_ml": delivery.dark_ml,
-            },
+            {"transaction_id": gold_transaction_id, "change": -delivery.gold_paid},
+        )
+
+        # Create an ml transaction
+        ml_transaction = connection.execute(
+            sqlalchemy.text(
+                """INSERT INTO ml_transactions (description) 
+                   VALUES (:description) 
+                   RETURNING id"""
+            ),
+            {"description": f"Received barrels with ML"},
+        ).one()
+        ml_transaction_id = ml_transaction.id
+
+        # Add ml ledger entries for each color
+        if delivery.red_ml > 0:
+            connection.execute(
+                sqlalchemy.text(
+                    """INSERT INTO ml_ledger_entries (ml_transaction_id, color, change) 
+                       VALUES (:transaction_id, :color, :change)"""
+                ),
+                {"transaction_id": ml_transaction_id, "color": "red", "change": delivery.red_ml},
+            )
+        if delivery.green_ml > 0:
+            connection.execute(
+                sqlalchemy.text(
+                    """INSERT INTO ml_ledger_entries (ml_transaction_id, color, change) 
+                       VALUES (:transaction_id, :color, :change)"""
+                ),
+                {"transaction_id": ml_transaction_id, "color": "green", "change": delivery.green_ml},
+            )
+        if delivery.blue_ml > 0:
+            connection.execute(
+                sqlalchemy.text(
+                    """INSERT INTO ml_ledger_entries (ml_transaction_id, color, change) 
+                       VALUES (:transaction_id, :color, :change)"""
+                ),
+                {"transaction_id": ml_transaction_id, "color": "blue", "change": delivery.blue_ml},
+            )
+        if delivery.dark_ml > 0:
+            connection.execute(
+                sqlalchemy.text(
+                    """INSERT INTO ml_ledger_entries (ml_transaction_id, color, change) 
+                       VALUES (:transaction_id, :color, :change)"""
+                ),
+                {"transaction_id": ml_transaction_id, "color": "dark", "change": delivery.dark_ml},
+            )
+
+        # Store the processed request
+        connection.execute(
+            sqlalchemy.text(
+                """INSERT INTO processed_requests (request_id, response) 
+                   VALUES (:request_id, :response)"""
+            ),
+            {"request_id": request_id, "response": sqlalchemy.JSON.cache_ok},
         )
 
 
@@ -185,16 +252,43 @@ def get_wholesale_purchase_plan(wholesale_catalog: List[Barrel]):
     """
     print(f"barrel catalog: {wholesale_catalog}")
 
-    sql_to_execute = """ SELECT gold, max_barrel_capacity - (red_ml + green_ml + blue_ml + dark_ml) AS remaining_barrel_capacity, red_ml, green_ml, blue_ml, dark_ml FROM global_inventory """
-
     with db.engine.begin() as connection:
-        result = connection.execute(sqlalchemy.text(sql_to_execute)).one()
-        gold = result.gold
-        remaining_barrel_capacity = result.remaining_barrel_capacity
-        red_ml = result.red_ml
-        green_ml = result.green_ml
-        blue_ml = result.blue_ml
-        dark_ml = result.dark_ml
+        # Get gold from ledger (sum all gold ledger entries)
+        gold_result = connection.execute(
+            sqlalchemy.text(
+                "SELECT COALESCE(SUM(change), 0) as gold FROM gold_ledger_entries"
+            )
+        ).one()
+        gold = gold_result.gold
+
+        # Get ml amounts from ledger (sum all ml ledger entries by color)
+        ml_result = connection.execute(
+            sqlalchemy.text(
+                """SELECT 
+                   COALESCE(SUM(CASE WHEN color = 'red' THEN change ELSE 0 END), 0) as red_ml,
+                   COALESCE(SUM(CASE WHEN color = 'green' THEN change ELSE 0 END), 0) as green_ml,
+                   COALESCE(SUM(CASE WHEN color = 'blue' THEN change ELSE 0 END), 0) as blue_ml,
+                   COALESCE(SUM(CASE WHEN color = 'dark' THEN change ELSE 0 END), 0) as dark_ml
+                FROM ml_ledger_entries"""
+            )
+        ).one()
+
+        # Get capacity from global_inventory
+        capacity_result = connection.execute(
+            sqlalchemy.text(
+                "SELECT max_barrel_capacity FROM global_inventory"
+            )
+        ).one()
+
+        max_barrel_capacity = capacity_result.max_barrel_capacity
+        # Calculate remaining capacity
+        total_ml_used = ml_result.red_ml + ml_result.green_ml + ml_result.blue_ml + ml_result.dark_ml
+        remaining_barrel_capacity = max_barrel_capacity - total_ml_used
+
+        red_ml = ml_result.red_ml
+        green_ml = ml_result.green_ml
+        blue_ml = ml_result.blue_ml
+        dark_ml = ml_result.dark_ml
 
     # TODO: fill in values correctly based on what is in your database
     return create_barrel_plan(
