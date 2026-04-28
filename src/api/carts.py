@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
+import json
 import sqlalchemy
 from src.api import auth
 from enum import Enum
@@ -203,8 +204,6 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
 
         if existing_request:
             # Already processed, return the stored response
-            import json
-
             response_data = (
                 existing_request.response
                 if isinstance(existing_request.response, dict)
@@ -380,7 +379,7 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
                 """INSERT INTO processed_requests (request_id, response) 
                    VALUES (:request_id, :response)"""
             ),
-            {"request_id": request_id, "response": response_data},
+            {"request_id": request_id, "response": json.dumps(response_data)},
         )
 
     return CheckoutResponse(
