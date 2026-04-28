@@ -223,5 +223,5 @@ def deliver_capacity_plan(capacity_purchase: CapacityPlan, order_id: int):
                 """INSERT INTO processed_requests (request_id, response) 
                    VALUES (:request_id, :response)"""
             ),
-            {"request_id": request_id, "response": sqlalchemy.JSON.cache_ok},
+            {"request_id": request_id, "response": {}},
         )

@@ -398,7 +398,7 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
                 """INSERT INTO processed_requests (request_id, response) 
                    VALUES (:request_id, :response)"""
             ),
-            {"request_id": request_id, "response": sqlalchemy.JSON(response_data)},
+            {"request_id": request_id, "response": response_data},
         )
 
     return CheckoutResponse(

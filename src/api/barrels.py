@@ -179,7 +179,7 @@ def post_deliver_barrels(barrels_delivered: List[Barrel], order_id: int):
                 """INSERT INTO processed_requests (request_id, response) 
                    VALUES (:request_id, :response)"""
             ),
-            {"request_id": request_id, "response": sqlalchemy.JSON.cache_ok},
+            {"request_id": request_id, "response": {}},
         )
 
 
