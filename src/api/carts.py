@@ -263,11 +263,6 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
                 .qty
             )
 
-            if quantity_on_hand < quantity:
-                raise HTTPException(
-                    status_code=400, detail="Not enough potion inventory"
-                )
-
             total_potions_bought += quantity
             total_gold_paid += quantity * price
 
