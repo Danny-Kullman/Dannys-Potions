@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, Field, field_validator
 from typing import List
+import json
 from src.api import auth
 from src import database as db
 import sqlalchemy
@@ -210,7 +211,7 @@ def post_deliver_bottles(potions_delivered: List[PotionMixes], order_id: int):
                 """INSERT INTO processed_requests (request_id, response) 
                    VALUES (:request_id, :response)"""
             ),
-            {"request_id": request_id, "response": {}},
+            {"request_id": request_id, "response": json.dumps({})},
         )
 
 

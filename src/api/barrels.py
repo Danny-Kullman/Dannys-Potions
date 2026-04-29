@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, Field, field_validator
 from typing import List
+import json
 
 import sqlalchemy
 from src.api import auth
@@ -179,7 +180,7 @@ def post_deliver_barrels(barrels_delivered: List[Barrel], order_id: int):
                 """INSERT INTO processed_requests (request_id, response) 
                    VALUES (:request_id, :response)"""
             ),
-            {"request_id": request_id, "response": {}},
+            {"request_id": request_id, "response": json.dumps({})},
         )
 
 
