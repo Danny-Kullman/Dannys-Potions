@@ -30,6 +30,7 @@ def reset():
         connection.execute(sqlalchemy.text("DELETE FROM potion_ledger_entries"))
         connection.execute(sqlalchemy.text("DELETE FROM potion_transactions"))
         connection.execute(sqlalchemy.text("DELETE FROM potions"))
+        connection.execute(sqlalchemy.text("UPDATE potions SET quantity_on_hand = 0"))
 
         # Reset all ML inventory movement in the ledger.
         connection.execute(sqlalchemy.text("DELETE FROM ml_ledger_entries"))
