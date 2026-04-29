@@ -29,7 +29,7 @@ def reset():
         # Reset all potion counts in both legacy and ledger-based systems.
         connection.execute(sqlalchemy.text("DELETE FROM potion_ledger_entries"))
         connection.execute(sqlalchemy.text("DELETE FROM potion_transactions"))
-        connection.execute(sqlalchemy.text("UPDATE potions SET quantity_on_hand = 0"))
+        connection.execute(sqlalchemy.text("DELETE FROM potions"))
 
         # Reset all ML inventory movement in the ledger.
         connection.execute(sqlalchemy.text("DELETE FROM ml_ledger_entries"))
