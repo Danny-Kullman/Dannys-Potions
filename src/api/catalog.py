@@ -24,10 +24,14 @@ def create_catalog() -> List[CatalogItem]:
     with db.engine.begin() as connection:
         result = connection.execute(
             sqlalchemy.text(
-                """SELECT sku, name, price, quantity_on_hand, red_ml, green_ml, blue_ml, dark_ml
-                FROM potions 
-                WHERE quantity_on_hand > 0 
-                ORDER BY price ASC"""
+                """SELECT p.sku, p.name, p.price,
+                   COALESCE(SUM(pl.change), 0) as quantity_on_hand,
+                   p.red_ml, p.green_ml, p.blue_ml, p.dark_ml
+                FROM potions p
+                LEFT JOIN potion_ledger_entries pl ON p.id = pl.potion_id
+                GROUP BY p.id, p.sku, p.name, p.price, p.red_ml, p.green_ml, p.blue_ml, p.dark_ml
+                HAVING COALESCE(SUM(pl.change), 0) > 0
+                ORDER BY p.price ASC"""
             )
         ).fetchall()
 

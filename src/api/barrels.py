@@ -227,7 +227,6 @@ def create_barrel_plan(
             for barrel in wholesale_catalog
             if int(barrel.ml_per_barrel * barrel.potion_type[color_idx]) > 0
         ]
-
         # Prioritize barrels that provide the most of the current scarce color.
         eligible_barrels.sort(
             key=lambda barrel: (
