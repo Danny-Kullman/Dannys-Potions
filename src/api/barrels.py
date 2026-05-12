@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, Field, field_validator
 from typing import List
+import json
 
 import sqlalchemy
 from src.api import auth
@@ -179,7 +180,7 @@ def post_deliver_barrels(barrels_delivered: List[Barrel], order_id: int):
                 """INSERT INTO processed_requests (request_id, response) 
                    VALUES (:request_id, :response)"""
             ),
-            {"request_id": request_id, "response": {}},
+            {"request_id": request_id, "response": json.dumps({})},
         )
 
 
@@ -226,7 +227,6 @@ def create_barrel_plan(
             for barrel in wholesale_catalog
             if int(barrel.ml_per_barrel * barrel.potion_type[color_idx]) > 0
         ]
-
         # Prioritize barrels that provide the most of the current scarce color.
         eligible_barrels.sort(
             key=lambda barrel: (

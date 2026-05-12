@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, Field
+import json
 import sqlalchemy
 from src.api import auth
 from src import database as db
@@ -223,5 +224,5 @@ def deliver_capacity_plan(capacity_purchase: CapacityPlan, order_id: int):
                 """INSERT INTO processed_requests (request_id, response) 
                    VALUES (:request_id, :response)"""
             ),
-            {"request_id": request_id, "response": {}},
+            {"request_id": request_id, "response": json.dumps({})},
         )
