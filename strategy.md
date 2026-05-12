@@ -19,13 +19,3 @@ The strategy is now to use Supabase views as the source of truth for decision-ma
 4. Use `v_sales_by_hour_summary` to find peak demand windows.
 - That view shows the busiest hours overall.
 - Use it to schedule inventory, pricing, or brewing focus around the busiest periods.
-
-## Decision Rule
-
-- If a potion is in the top demand groups and also sells during peak hours, keep it available.
-- If a barrel offer has a low `cost_per_ml` and supports high-demand potion colors, buy it.
-- If a potion does not appear in the demand or hour summaries, deprioritize it.
-
-## Goal
-
-The goal is to maximize profit by making the Supabase views the operational dashboard for purchasing and brewing decisions.

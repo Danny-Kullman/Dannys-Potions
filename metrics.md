@@ -1,9 +1,5 @@
 # Potion Shop Metrics Views
 
-This version uses Supabase-visible SQL views instead of local chart scripts. After running the migration, these views will appear in Supabase and can be queried directly for your metrics dashboard.
-
-## Views
-
 ### `v_sales_per_potion_by_hour`
 Sales per potion by hour, grouped by potion and hour.
 
@@ -89,10 +85,3 @@ SELECT *
 FROM v_sales_by_hour_summary
 ORDER BY hour_of_day;
 ```
-
-## How To Use In Supabase
-
-1. Run the migration.
-2. Open Supabase Table Editor.
-3. Select the `Views` section.
-4. Use the four views above for charts, filters, and dashboard queries.
